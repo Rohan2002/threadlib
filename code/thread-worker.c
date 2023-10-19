@@ -62,9 +62,9 @@ int worker_create(worker_t * thread, pthread_attr_t * attr,
 	cctx.uc_stack.ss_size=STACK_SIZE;
 	cctx.uc_stack.ss_flags=0;
 	
-	printf("Function pointer: %p\n", &cctx);
+	// printf("Function pointer: %p\n", &cctx);
 	// // populates cctx struct
-	makecontext(&cctx,&function,0);
+	makecontext(&cctx,function,0);
 	setcontext(&cctx);
     return 0;
 };
@@ -195,5 +195,5 @@ void print_app_stats(void) {
 
 int main(int argc, char **argv) {
 	int tid = worker_create(1, NULL, simplef, NULL);
-	// printf("Hello\n");
+	printf("Hello\n");
 }
