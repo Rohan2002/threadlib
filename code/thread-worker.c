@@ -4,7 +4,13 @@
 // username of iLab:
 // iLab Server:
 
+#include <stdio.h>
+#include <stdlib.h>
 #include "thread-worker.h"
+#include <ucontext.h>
+#include <sys/types.h>
+#include <signal.h>
+#include <unistd.h>
 
 //Global counter for total context switches and 
 //average turn around and response time
@@ -12,11 +18,14 @@ long tot_cntx_switches=0;
 double avg_turn_time=0;
 double avg_resp_time=0;
 
+#define STACK_SIZE SIGSTKSZ
 
 // INITAILIZE ALL YOUR OTHER VARIABLES HERE
 // YOUR CODE HERE
 
-
+void simplef(){
+  puts("Donald- you are threaded\n");
+}
 /* create a new thread */
 int worker_create(worker_t * thread, pthread_attr_t * attr, 
                       void *(*function)(void*), void * arg) {
@@ -27,8 +36,36 @@ int worker_create(worker_t * thread, pthread_attr_t * attr,
        // after everything is set, push this thread into run queue and 
        // - make it ready for the execution.
 
-       // YOUR CODE HERE
+    
+	tcb* thread_tcb = malloc(sizeof(tcb));
+	if (thread_tcb == NULL){
+		perror("failed to create thread control block");
+		exit(1);
+	}
+
+	ucontext_t cctx;
+	if (getcontext(&cctx) < 0){
+		perror("getcontext");
+		exit(1);
+	}
+
+	void *stack=malloc(STACK_SIZE);
 	
+	if (stack == NULL){
+		perror("Failed to allocate stack");
+		exit(1);
+	}
+	
+	/* Setup context that we are going to use */
+	cctx.uc_link=NULL;
+	cctx.uc_stack.ss_sp=stack;
+	cctx.uc_stack.ss_size=STACK_SIZE;
+	cctx.uc_stack.ss_flags=0;
+	
+	printf("Function pointer: %p\n", &cctx);
+	// // populates cctx struct
+	makecontext(&cctx,&function,0);
+	setcontext(&cctx);
     return 0;
 };
 
@@ -156,3 +193,7 @@ void print_app_stats(void) {
 
 // YOUR CODE HERE
 
+int main(int argc, char **argv) {
+	int tid = worker_create(1, NULL, simplef, NULL);
+	// printf("Hello\n");
+}

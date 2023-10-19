@@ -20,6 +20,12 @@
 #include <stdlib.h>
 
 typedef uint worker_t;
+typedef enum {
+    THREAD_READY,
+    THREAD_RUNNING,
+    THREAD_BLOCKED,
+    THREAD_FINISHED 
+} thread_status;
 
 typedef struct TCB {
 	/* add important states in a thread control block */
@@ -31,6 +37,9 @@ typedef struct TCB {
 	// And more ...
 
 	// YOUR CODE HERE
+	worker_t thread_id;
+	thread_status thread_stat;
+	int thread_priority;
 } tcb; 
 
 /* mutex struct definition */
