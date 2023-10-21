@@ -38,8 +38,10 @@ typedef struct TCB {
 
 	// YOUR CODE HERE
 	worker_t thread_id;
-	thread_status thread_stat;
-	int thread_priority;
+	ucontext_t context;
+	void* stack;
+	thread_status status;
+	int priority;
 } tcb; 
 
 /* mutex struct definition */

@@ -23,6 +23,12 @@ double avg_resp_time=0;
 // INITAILIZE ALL YOUR OTHER VARIABLES HERE
 // YOUR CODE HERE
 
+thread_manager manager;
+
+std::queue<tcb*> ready_queue;
+
+tcb* current_thread = NULL;
+
 void simplef(){
   puts("Donald- you are threaded\n");
 }
@@ -37,35 +43,33 @@ int worker_create(worker_t * thread, pthread_attr_t * attr,
        // - make it ready for the execution.
 
     
-	tcb* thread_tcb = malloc(sizeof(tcb));
+	tcb* thread_tcb = (tcb *)malloc(sizeof(tcb));
 	if (thread_tcb == NULL){
 		perror("failed to create thread control block");
 		exit(1);
 	}
 
-	ucontext_t cctx;
-	if (getcontext(&cctx) < 0){
-		perror("getcontext");
-		exit(1);
-	}
-
-	void *stack=malloc(STACK_SIZE);
-	
-	if (stack == NULL){
-		perror("Failed to allocate stack");
-		exit(1);
-	}
+	if (getcontext(&thread_tcb->context) == -1) {
+        perror("Failed to get new thread context");
+        free(thread_tcb);
+        exit(1);
+    }
 	
 	/* Setup context that we are going to use */
-	cctx.uc_link=NULL;
-	cctx.uc_stack.ss_sp=stack;
-	cctx.uc_stack.ss_size=STACK_SIZE;
-	cctx.uc_stack.ss_flags=0;
+	thread_tcb->context.uc_link=NULL;
+	thread_tcb->context.uc_stack.ss_sp = malloc(STACK_SIZE);
+	if (thread_tcb->context.uc_stack.ss_sp == NULL) {
+        perror("Failed to allocate stack");
+        free(thread_tcb);
+        exit(1);
+    }
+	thread_tcb->context.uc_stack.ss_size=STACK_SIZE;
+	thread_tcb->context.uc_stack.ss_flags=0;
 	
 	// printf("Function pointer: %p\n", &cctx);
 	// // populates cctx struct
-	makecontext(&cctx,function,0);
-	setcontext(&cctx);
+	makecontext(&thread_tcb->context,function,0);
+	setcontext(&thread_tcb->context);
     return 0;
 };
 
