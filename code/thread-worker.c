@@ -20,20 +20,31 @@ double avg_resp_time=0;
 
 #define STACK_SIZE SIGSTKSZ
 
-// INITAILIZE ALL YOUR OTHER VARIABLES HERE
-// YOUR CODE HERE
+#define CHECK_MALLOC(ptr) \
+    if ((ptr) == NULL) { \
+        fprintf(stderr, "Memory allocation failed at %s:%d\n", __FILE__, __LINE__); \
+        exit(EXIT_FAILURE); \
+    } \
 
-thread_manager manager;
-
-std::queue<tcb*> ready_queue;
+#define CHECK_THREAD_CONTEXT(thread_tcb) \
+    if (getcontext(&(thread_tcb)->context) < 0) { \
+        fprintf(stderr, "Failed to get thread context at %s:%d\n", __FILE__, __LINE__); \
+        free(thread_tcb); \
+        exit(EXIT_FAILURE); \
+    }
 
 tcb* current_thread = NULL;
 
-void simplef(){
+void* simplef(void* args){
+	int* p = args;
+	for(int i = 0; i < 5; i++){
+		printf("Arg: %d\n", p[i]);
+	}
   puts("Donald- you are threaded\n");
+  return NULL;
 }
 /* create a new thread */
-int worker_create(worker_t * thread, pthread_attr_t * attr, 
+int worker_create(worker_t* thread, pthread_attr_t * attr, 
                       void *(*function)(void*), void * arg) {
 
        // - create Thread Control Block (TCB)
@@ -44,31 +55,19 @@ int worker_create(worker_t * thread, pthread_attr_t * attr,
 
     
 	tcb* thread_tcb = (tcb *)malloc(sizeof(tcb));
-	if (thread_tcb == NULL){
-		perror("failed to create thread control block");
-		exit(1);
-	}
-
-	if (getcontext(&thread_tcb->context) == -1) {
-        perror("Failed to get new thread context");
-        free(thread_tcb);
-        exit(1);
-    }
+	CHECK_MALLOC(thread_tcb);
+	CHECK_THREAD_CONTEXT(thread_tcb);
 	
 	/* Setup context that we are going to use */
 	thread_tcb->context.uc_link=NULL;
 	thread_tcb->context.uc_stack.ss_sp = malloc(STACK_SIZE);
-	if (thread_tcb->context.uc_stack.ss_sp == NULL) {
-        perror("Failed to allocate stack");
-        free(thread_tcb);
-        exit(1);
-    }
+	CHECK_MALLOC(thread_tcb->context.uc_stack.ss_sp);
+
 	thread_tcb->context.uc_stack.ss_size=STACK_SIZE;
 	thread_tcb->context.uc_stack.ss_flags=0;
 	
-	// printf("Function pointer: %p\n", &cctx);
-	// // populates cctx struct
-	makecontext(&thread_tcb->context,function,0);
+	makecontext(&thread_tcb->context, (void (*)(void))(function),1,arg);
+	// populates cctx struct
 	setcontext(&thread_tcb->context);
     return 0;
 };
@@ -142,46 +141,46 @@ int worker_mutex_destroy(worker_mutex_t *mutex) {
 	return 0;
 };
 
-/* scheduler */
-static void schedule() {
-	// - every time a timer interrupt occurs, your worker thread library 
-	// should be contexted switched from a thread context to this 
-	// schedule() function
+// /* scheduler */
+// static void schedule() {
+// 	// - every time a timer interrupt occurs, your worker thread library 
+// 	// should be contexted switched from a thread context to this 
+// 	// schedule() function
 
-	// - invoke scheduling algorithms according to the policy (PSJF or MLFQ)
+// 	// - invoke scheduling algorithms according to the policy (PSJF or MLFQ)
 
-	// if (sched == PSJF)
-	//		sched_psjf();
-	// else if (sched == MLFQ)
-	// 		sched_mlfq();
+// 	// if (sched == PSJF)
+// 	//		sched_psjf();
+// 	// else if (sched == MLFQ)
+// 	// 		sched_mlfq();
 
-	// YOUR CODE HERE
+// 	// YOUR CODE HERE
 
-// - schedule policy
-#ifndef MLFQ
-	// Choose PSJF
-#else 
-	// Choose MLFQ
-#endif
+// // - schedule policy
+// #ifndef MLFQ
+// 	// Choose PSJF
+// #else 
+// 	// Choose MLFQ
+// #endif
 
-}
+// }
 
-/* Pre-emptive Shortest Job First (POLICY_PSJF) scheduling algorithm */
-static void sched_psjf() {
-	// - your own implementation of PSJF
-	// (feel free to modify arguments and return types)
+// /* Pre-emptive Shortest Job First (POLICY_PSJF) scheduling algorithm */
+// static void sched_psjf() {
+// 	// - your own implementation of PSJF
+// 	// (feel free to modify arguments and return types)
 
-	// YOUR CODE HERE
-}
+// 	// YOUR CODE HERE
+// }
 
 
-/* Preemptive MLFQ scheduling algorithm */
-static void sched_mlfq() {
-	// - your own implementation of MLFQ
-	// (feel free to modify arguments and return types)
+// /* Preemptive MLFQ scheduling algorithm */
+// static void sched_mlfq() {
+// 	// - your own implementation of MLFQ
+// 	// (feel free to modify arguments and return types)
 
-	// YOUR CODE HERE
-}
+// 	// YOUR CODE HERE
+// }
 
 //DO NOT MODIFY THIS FUNCTION
 /* Function to print global statistics. Do not modify this function.*/
@@ -198,6 +197,12 @@ void print_app_stats(void) {
 // YOUR CODE HERE
 
 int main(int argc, char **argv) {
-	int tid = worker_create(1, NULL, simplef, NULL);
+	worker_t* tid_pointer = malloc(sizeof(worker_t));
+	*tid_pointer = 1;
+	int* args = (int*) calloc(5, sizeof(int));
+	args[1] = 2;
+	int tid = worker_create(tid_pointer, NULL, simplef, args);
+	printf("Created tid: %d\n", tid);
 	printf("Hello\n");
+	free(args);
 }
