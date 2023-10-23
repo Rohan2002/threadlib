@@ -103,9 +103,20 @@ int worker_create(worker_t *thread, pthread_attr_t *attr,
         return 0;
     }
 
-    if(!setcontext(&worker_thread->context)){
+    tcb *schedular_thread;
+    if(!_create_thread(&schedular_thread, thread)){
         return 0;
-    };
+    }
+
+    // create thread context for worker thread.
+    if(!_create_thread_context(schedular_thread, function, arg)){
+        return 0;
+    }
+
+    // if(!setcontext(&worker_thread->context)){
+    //     return 0;
+    // };
+    //    worker_exit(worker_thread);
 
     return 1;
 };
