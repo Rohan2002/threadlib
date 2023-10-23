@@ -58,7 +58,30 @@ typedef struct worker_mutex_t {
 // YOUR CODE HERE
 
 
+// Node structure for the queue
+typedef struct node {
+    int data; // Change this type if you need to store something else
+    struct node* next;
+} node_t;
+
+// Queue structure
+typedef struct queue {
+    node_t* front; // Points to the front node in the queue
+    node_t* rear;  // Points to the rear node in the queue
+} queue_t;
+
 /* Function Declarations: */
+
+//for implementing Queue data structure
+
+queue_t* create_queue();
+void enqueue(queue_t* q, int value);
+int dequeue(queue_t* q);
+int is_empty(queue_t* q);
+int front(queue_t* q);
+void destroy_queue(queue_t* q);
+
+
 
 /* create a new thread */
 int worker_create(worker_t * thread, pthread_attr_t * attr, void
