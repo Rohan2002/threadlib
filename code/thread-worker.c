@@ -108,6 +108,10 @@ int worker_mutex_init(worker_mutex_t *mutex,
 	//- initialize data structures for this mutex
 
 	// YOUR CODE HERE
+
+	mutex->locked = 0;  // Indicates that mutex is unlocked initially. 0 for unlocked, 1 for locked.
+    mutex->owner = NULL; // No owner yet because it's unlocked
+    mutex->block_list = createQueue(); // A queue to manage threads waiting for this mutex
 	return 0;
 };
 
@@ -120,6 +124,18 @@ int worker_mutex_lock(worker_mutex_t *mutex) {
         // context switch to the scheduler thread
 
         // YOUR CODE HERE
+
+		// using the built-in atomic test set function in a loop to test the mutex
+		while (__sync_lock_test_and_set(&mutex->locked, 1)) {
+			// Mutex has been locked, we will add the current thread to the list of threads waiting for unlock
+			enqueue(mutex->block_list, getCurrentThread());
+			// Context switch to the scheduler to run other threads
+			schedule();  // This should save the current state and switch to scheduler context (!!Not implemented yet!!)
+		}
+		
+		// If we've reached here, it means we've acquired the lock
+		mutex->owner = getCurrentThread();  // The current thread is now the owner of the mutex
+		
         return 0;
 };
 
@@ -130,6 +146,26 @@ int worker_mutex_unlock(worker_mutex_t *mutex) {
 	// so that they could compete for mutex later.
 
 	// YOUR CODE HERE
+
+	if (mutex->owner != getCurrentThread()) {
+        // The current thread is trying to unlock a mutex it doesn't own
+        return -1;  // Return an error condition
+    }
+    
+    // Clear the owner and unlock
+    mutex->owner = NULL;
+    __sync_lock_release(&mutex->locked);  // Unlock mutex by setting to 0
+    
+    // If there are threads waiting for this mutex, time to wake them up
+    if (!is_empty(mutex->block_list)) {
+        // Move all threads from block list to run queue, they're ready to run
+        while (!is_empty(mutex->block_list)) {
+            tcb* next_thread = dequeue(mutex->block_list);
+            // Add the thread to the ready queue, so scheduler can run it
+            //Ready Queue not implemented.
+        }
+    }
+
 	return 0;
 };
 
@@ -288,4 +324,8 @@ void destroy_queue(queue_t* q) {
     }
 
     free(q);
+}
+
+tcb* getCurrentThread() {
+    return current_thread;
 }
