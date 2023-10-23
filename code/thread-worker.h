@@ -45,19 +45,6 @@ typedef struct TCB {
 	int priority;
 } tcb; 
 
-/* mutex struct definition */
-typedef struct worker_mutex_t {
-	/* add something here */
-
-	// YOUR CODE HERE
-} worker_mutex_t;
-
-/* define your data structures here: */
-// Feel free to add your own auxiliary data structures (linked list or queue etc...)
-
-// YOUR CODE HERE
-
-
 // Node structure for the queue
 typedef struct node {
     int data; // Change this type if you need to store something else
@@ -69,6 +56,25 @@ typedef struct queue {
     node_t* front; // Points to the front node in the queue
     node_t* rear;  // Points to the rear node in the queue
 } queue_t;
+
+/* mutex struct definition */
+typedef struct worker_mutex_t {
+	/* add something here */
+
+	// YOUR CODE HERE
+
+	volatile int locked;  // Flag indicating whether the mutex is locked (1) or unlocked (0)
+    tcb *owner;           // Pointer to the TCB of the owning thread
+    queue_t *block_list;  // Queue of TCBs of threads blocked waiting for this mutex
+
+} worker_mutex_t;
+
+/* define your data structures here: */
+// Feel free to add your own auxiliary data structures (linked list or queue etc...)
+
+// YOUR CODE HERE
+
+
 
 /* Function Declarations: */
 
