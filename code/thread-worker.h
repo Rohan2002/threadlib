@@ -21,12 +21,14 @@
 #include <ucontext.h>
 
 typedef uint worker_t;
+
+
 typedef enum {
     THREAD_READY,
     THREAD_RUNNING,
     THREAD_BLOCKED,
     THREAD_FINISHED 
-} thread_status;
+} Threads_state;
 
 typedef struct TCB {
 	/* add important states in a thread control block */
@@ -41,7 +43,7 @@ typedef struct TCB {
 	worker_t thread_id;
 	ucontext_t context;
 	void* stack;
-	thread_status status;
+	Threads_state status;
 	int priority;
 } tcb; 
 
