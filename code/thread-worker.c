@@ -7,10 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "thread-worker.h"
-#include <ucontext.h>
-#include <sys/types.h>
-#include <signal.h>
-#include <unistd.h>
+#include <sys/time.h>
 
 // Global counter for total context switches and
 // average turn around and response time
@@ -21,6 +18,9 @@ double avg_resp_time = 0;
 #define STACK_SIZE SIGSTKSZ
 
 tcb *current_thread = NULL;
+tcb *schedular_thread = NULL;
+
+queue_t *thread_queue = NULL;
 
 void *simplef(void *args)
 {
@@ -42,13 +42,33 @@ int safe_malloc(void** ptr, size_t size){
     return *ptr != NULL;
 }
 
-int populate_thread_context(tcb* thread_tcb){
+void fall_back_to_schedular(int signum){
+	worker_yield();
+}
+void create_thread_timer(){
+    struct itimerval timer;
+    struct sigaction sa;
+
+    memset (&sa, 0, sizeof(sa));
+    sa.sa_handler = &fall_back_to_schedular;
+	sigaction (SIGPROF, &sa, NULL);
+
+    timer.it_interval.tv_usec = 0; 
+	timer.it_interval.tv_sec = QUANTUM;
+
+	timer.it_value.tv_usec = 0;
+	timer.it_value.tv_sec = QUANTUM;
+
+	setitimer(ITIMER_PROF, &timer, NULL);
+}
+
+int _populate_thread_context(tcb* thread_tcb){
     return getcontext(&(thread_tcb)->context) >= 0;
 }
 
 int _create_thread_context(tcb *thread_tcb, void *(*function)(void *), void *arg)
 {
-    if(!populate_thread_context(thread_tcb)){
+    if(!_populate_thread_context(thread_tcb)){
         return 0;
     }
 
@@ -86,13 +106,33 @@ int _create_thread(tcb **thread_tcb_pointer, worker_t *thread_id){
 int worker_create(worker_t *thread, pthread_attr_t *attr,
                   void *(*function)(void *), void *arg)
 {
-
     // - create Thread Control Block (TCB)
     // - create and initialize the context of this worker thread
     // - allocate space of stack for this thread to run
     // after everything is set, push this thread into run queue and
     // - make it ready for the execution.
 
+    // init thread queue
+    if (getThreadQueue() == NULL){
+        queue_t *q = create_queue();
+        setThreadQueue(q);
+    }
+
+    // init schedular only for the first time
+    if (getSchedularThread() == NULL){
+        tcb *schedular_thread;
+        if(!_create_thread(&schedular_thread, thread)){
+            return 0;
+        }
+        // create thread context for worker thread.
+        if(!_create_thread_context(schedular_thread, schedule_entry_point, NULL)){
+            return 0;
+        }
+        setSchedularThread(schedular_thread);
+        create_thread_timer();
+    }
+
+    // worker thread
     tcb *worker_thread;
     if(!_create_thread(&worker_thread, thread)){
         return 0;
@@ -102,34 +142,25 @@ int worker_create(worker_t *thread, pthread_attr_t *attr,
     if(!_create_thread_context(worker_thread, function, arg)){
         return 0;
     }
-
-    tcb *schedular_thread;
-    if(!_create_thread(&schedular_thread, thread)){
-        return 0;
-    }
-
-    // create thread context for worker thread.
-    if(!_create_thread_context(schedular_thread, function, arg)){
-        return 0;
-    }
-
-    // if(!setcontext(&worker_thread->context)){
-    //     return 0;
-    // };
-    //    worker_exit(worker_thread);
-
+    setCurrentThread(worker_thread);
+    enqueue(getThreadQueue(), worker_thread); 
     return 1;
 };
 
 /* give CPU possession to other user-level worker threads voluntarily */
 int worker_yield()
 {
-
     // - change worker thread's state from Running to Ready
     // - save context of this thread to its thread control block
     // - switch from thread context to scheduler context
+    if (getCurrentThread() == NULL || getSchedularThread() == NULL){
+        return 0;
+    }
+    tcb* current_thread = getCurrentThread();
+    tcb* schedular_thread = getSchedularThread();
 
-    // YOUR CODE HERE
+    current_thread->status = THREAD_READY;
+    swapcontext(&(current_thread->context), &(schedular_thread->context));
 
     return 0;
 };
@@ -216,7 +247,7 @@ int worker_mutex_unlock(worker_mutex_t *mutex)
     if (!is_empty(mutex->block_list)) {
         // Move all threads from block list to run queue, they're ready to run
         while (!is_empty(mutex->block_list)) {
-            tcb* next_thread = dequeue(mutex->block_list);
+            // tcb* next_thread = dequeue(mutex->block_list);
             // Add the thread to the ready queue, so scheduler can run it
             //Ready Queue not implemented.
         }
@@ -239,37 +270,47 @@ int worker_mutex_destroy(worker_mutex_t *mutex)
 	return 0;
 };
 
-// /* scheduler */
-// static void schedule() {
-// 	// - every time a timer interrupt occurs, your worker thread library
-// 	// should be contexted switched from a thread context to this
-// 	// schedule() function
+/* scheduler */
+void* schedule_entry_point(void* args){
+    schedule();
+    return NULL;
+}
 
-// 	// - invoke scheduling algorithms according to the policy (PSJF or MLFQ)
+static void schedule() {
+    printf("The scheduler thread is active;");
+    sched_psjf();
+	// - every time a timer interrupt occurs, your worker thread library
+	// should be contexted switched from a thread context to this
+	// schedule() function
 
-// 	// if (sched == PSJF)
-// 	//		sched_psjf();
-// 	// else if (sched == MLFQ)
-// 	// 		sched_mlfq();
+	// - invoke scheduling algorithms according to the policy (PSJF or MLFQ)
 
-// 	// YOUR CODE HERE
+	// if (sched == PSJF)
+	//		sched_psjf();
+	// else if (sched == MLFQ)
+	// 		sched_mlfq();
 
-// // - schedule policy
-// #ifndef MLFQ
-// 	// Choose PSJF
-// #else
-// 	// Choose MLFQ
-// #endif
+	// YOUR CODE HERE
 
-// }
+    // - schedule policy
+    // #ifndef MLFQ
+    //     // Choose PSJF
+    // #else
+    //     // Choose MLFQ
+    // #endif
+
+}
 
 // /* Pre-emptive Shortest Job First (POLICY_PSJF) scheduling algorithm */
-// static void sched_psjf() {
-// 	// - your own implementation of PSJF
-// 	// (feel free to modify arguments and return types)
-
-// 	// YOUR CODE HERE
-// }
+static void sched_psjf() {
+    if(!is_empty(getThreadQueue())){
+        tcb* thread_to_run = dequeue(getThreadQueue());
+        Threads_state ts = THREAD_RUNNING;
+        thread_to_run->status = THREAD_RUNNING;
+        setCurrentThread(thread_to_run);
+        swapcontext(&(getSchedularThread()->context), &(getCurrentThread())->context);
+    }
+}
 
 // /* Preemptive MLFQ scheduling algorithm */
 // static void sched_mlfq() {
@@ -300,105 +341,32 @@ int main(int argc, char **argv)
     int *args = (int *)calloc(5, sizeof(int));
     args[1] = 2;
     int tid = worker_create(tid_pointer, NULL, simplef, args);
+    worker_yield();
     printf("Created tid: %d\n", tid);
     printf("Hello\n");
     free(args);
 }
 
-// queue_t holds reference to the front and rear node of the queue
-queue_t *create_queue()
-{
-    queue_t *q = malloc(sizeof(queue_t));
-    if (q == NULL)
-    {
-        perror("Unable to allocate memory for new queue");
-        exit(EXIT_FAILURE); // Exit the program as we couldn't create the queue
-    }
-    q->front = q->rear = NULL;
-    return q;
-}
-
-// adds element to the queue
-void enqueue(queue_t *q, int value)
-{
-    node_t *new_node = malloc(sizeof(node_t));
-    if (new_node == NULL)
-    {
-        perror("Unable to allocate memory for new node");
-        exit(EXIT_FAILURE); // Exit the program as we couldn't enqueue new item
-    }
-    new_node->data = value;
-    new_node->next = NULL;
-
-    // If queue is empty, the new node is both the front and the rear
-    if (q->rear == NULL)
-    {
-        q->front = q->rear = new_node;
-        return;
-    }
-
-    // Add the new node at the end of the queue and change rear
-    q->rear->next = new_node;
-    q->rear = new_node;
-}
-
-int dequeue(queue_t *q)
-{
-    // If queue is empty, return a special value or error
-    if (q->front == NULL)
-    {
-        fprintf(stderr, "Queue is empty, unable to dequeue\n");
-        return -1; // Or another special value to indicate error
-    }
-
-    // Store previous front and move front one node ahead
-    node_t *temp_node = q->front;
-    int item = temp_node->data;
-    q->front = q->front->next;
-
-    // If front becomes NULL, then change rear also to NULL
-    if (q->front == NULL)
-    {
-        q->rear = NULL;
-    }
-
-    free(temp_node);
-    return item;
-}
-
-// Function to check if the queue is empty
-int is_empty(queue_t *q)
-{
-    return q->front == NULL;
-}
-
-// Function to get the front of the queue
-int front(queue_t *q)
-{
-    if (q->front == NULL)
-    {
-        fprintf(stderr, "Queue is empty\n");
-        return -1; // Or another special value to indicate error
-    }
-    return q->front->data;
-}
-
-// Function to free the queue and its nodes
-void destroy_queue(queue_t *q)
-{
-    node_t *current = q->front;
-    node_t *next;
-
-    while (current != NULL)
-    {
-        next = current->next;
-        free(current);
-        current = next;
-    }
-
-    free(q);
+void setCurrentThread(tcb* thread_exec){
+    current_thread = thread_exec;
 }
 
 tcb* getCurrentThread() {
     return current_thread;
+}
+
+void setSchedularThread(tcb* thread_exec){
+    schedular_thread = thread_exec;
+}
+
+tcb* getSchedularThread() {
+    return schedular_thread;
+}
+
+void setThreadQueue(queue_t* q){
+    thread_queue = q;
+}
+
+queue_t* getThreadQueue() {
+    return thread_queue;
 }
