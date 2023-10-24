@@ -6,8 +6,10 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include "thread-worker.h"
 #include <sys/time.h>
+#include <string.h>
+#include "thread-worker.h"
+
 
 // Global counter for total context switches and
 // average turn around and response time
@@ -24,13 +26,17 @@ queue_t *thread_queue = NULL;
 
 void *simplef(void *args)
 {
-    int *p = args;
-    for (int i = 0; i < 5; i++)
-    {
-        printf("Arg: %d\n", p[i]);
+    // int *p = args;
+    // for (int i = 0; i < 5; i++)
+    // {
+    //     printf("Arg: %d\n", p[i]);
+    // }
+    // puts("Donald- you are threaded\n");
+    // return NULL;
+    int count = 0;
+    while(1){
+        printf("count: %d", count++);
     }
-    puts("Donald- you are threaded\n");
-    return NULL;
 }
 
 int safe_malloc(void** ptr, size_t size){
@@ -43,21 +49,24 @@ int safe_malloc(void** ptr, size_t size){
 }
 
 void fall_back_to_schedular(int signum){
-	worker_yield();
+	printf("fall back to scheduler\n");
+    worker_yield();
 }
+
 void create_thread_timer(){
-    struct itimerval timer;
+    printf("Create thread timer\n");
     struct sigaction sa;
 
     memset (&sa, 0, sizeof(sa));
     sa.sa_handler = &fall_back_to_schedular;
 	sigaction (SIGPROF, &sa, NULL);
 
+    struct itimerval timer;
     timer.it_interval.tv_usec = 0; 
-	timer.it_interval.tv_sec = QUANTUM;
+	timer.it_interval.tv_sec = 1;
 
 	timer.it_value.tv_usec = 0;
-	timer.it_value.tv_sec = QUANTUM;
+	timer.it_value.tv_sec = 1;
 
 	setitimer(ITIMER_PROF, &timer, NULL);
 }
@@ -160,6 +169,8 @@ int worker_yield()
     tcb* schedular_thread = getSchedularThread();
 
     current_thread->status = THREAD_READY;
+
+    setCurrentThread(current_thread);
     swapcontext(&(current_thread->context), &(schedular_thread->context));
 
     return 0;
@@ -277,7 +288,6 @@ void* schedule_entry_point(void* args){
 }
 
 static void schedule() {
-    printf("The scheduler thread is active;");
     sched_psjf();
 	// - every time a timer interrupt occurs, your worker thread library
 	// should be contexted switched from a thread context to this
@@ -303,10 +313,14 @@ static void schedule() {
 
 // /* Pre-emptive Shortest Job First (POLICY_PSJF) scheduling algorithm */
 static void sched_psjf() {
+    if (getCurrentThread() != NULL){
+        enqueue(getThreadQueue(), getCurrentThread());
+    }
+    printf("Finding next thread to schedule\n");
     if(!is_empty(getThreadQueue())){
         tcb* thread_to_run = dequeue(getThreadQueue());
         Threads_state ts = THREAD_RUNNING;
-        thread_to_run->status = THREAD_RUNNING;
+        thread_to_run->status = ts;
         setCurrentThread(thread_to_run);
         swapcontext(&(getSchedularThread()->context), &(getCurrentThread())->context);
     }
@@ -341,11 +355,15 @@ int main(int argc, char **argv)
     int *args = (int *)calloc(5, sizeof(int));
     args[1] = 2;
     int tid = worker_create(tid_pointer, NULL, simplef, args);
-    worker_yield();
     printf("Created tid: %d\n", tid);
-    printf("Hello\n");
     free(args);
+    free(tid_pointer);
+
+    // simulate timer.
+    // create_thread_timer();
+    // while(1);
 }
+
 
 void setCurrentThread(tcb* thread_exec){
     current_thread = thread_exec;

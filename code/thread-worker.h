@@ -20,7 +20,7 @@
 #include <stdlib.h>
 #include <ucontext.h>
 #include <signal.h>
-#include <queue.h>
+#include "queue.h"
 
 typedef uint worker_t;
 
@@ -77,6 +77,7 @@ void setSchedularThread(tcb* thread_exec);
 tcb* getSchedularThread();
 
 void setThreadQueue(queue_t* q);
+queue_t* getThreadQueue();
 
 /* create a new thread */
 int worker_create(worker_t * thread, pthread_attr_t * attr, void
@@ -108,6 +109,7 @@ int worker_mutex_destroy(worker_mutex_t *mutex);
 typedef struct sigaction signal_type;
 void *schedule_entry_point(void* args);
 static void schedule();
+static void sched_psjf();
 
 /* Function to print global statistics. Do not modify this function.*/
 void print_app_stats(void);

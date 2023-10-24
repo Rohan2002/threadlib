@@ -1,6 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
-#include <queue.h>
+#include "queue.h"
 // queue_t holds reference to the front and rear node of the queue
 queue_t *create_queue()
 {
@@ -18,6 +18,7 @@ queue_t *create_queue()
 void enqueue(queue_t *q, void* value)
 {
     node_t *new_node = malloc(sizeof(node_t));
+    
     if (new_node == NULL)
     {
         perror("Unable to allocate memory for new node");
