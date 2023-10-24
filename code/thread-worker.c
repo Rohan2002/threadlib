@@ -111,7 +111,7 @@ int worker_mutex_init(worker_mutex_t *mutex,
 
 	mutex->locked = 0;  // Indicates that mutex is unlocked initially. 0 for unlocked, 1 for locked.
     mutex->owner = NULL; // No owner yet because it's unlocked
-    mutex->block_list = createQueue(); // A queue to manage threads waiting for this mutex
+    mutex->block_list = create_queue(); // A queue to manage threads waiting for this mutex
 	return 0;
 };
 
