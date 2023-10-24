@@ -174,6 +174,12 @@ int worker_mutex_unlock(worker_mutex_t *mutex) {
 int worker_mutex_destroy(worker_mutex_t *mutex) {
 	// - de-allocate dynamic memory created in worker_mutex_init
 
+    //if mutex is locked, we cannot destroy it as it will keep the list blocked.
+    if (mutex->locked){
+        return -1;
+    }
+
+    destroy_queue(mutex->block_list);
 	return 0;
 };
 
