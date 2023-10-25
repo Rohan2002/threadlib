@@ -24,7 +24,9 @@ tcb *schedular_thread = NULL;
 
 queue_t *thread_queue = NULL;
 
-void *simplef(void *args)
+int firstTimeWorkerThread = 1;
+
+void *inf_loop(void *args)
 {
     // int *p = args;
     // for (int i = 0; i < 5; i++)
@@ -35,8 +37,28 @@ void *simplef(void *args)
     // return NULL;
     int count = 0;
     while(1){
-        printf("count: %d", count++);
+        printf("count t1: %d\n", count++);
     }
+    return NULL;
+}
+void *immediate_return(void *args)
+{
+    // int *p = args;
+    // for (int i = 0; i < 5; i++)
+    // {
+    //     printf("Arg: %d\n", p[i]);
+    // }
+    // puts("Donald- you are threaded\n");
+    // return NULL;
+    int count = 0;
+    while(1){
+        // if (count == 10){
+        //     break;
+        // }
+        printf("count t2: %d\n", count++);
+    }
+    // while(1);
+    return NULL;
 }
 
 int safe_malloc(void** ptr, size_t size){
@@ -50,7 +72,8 @@ int safe_malloc(void** ptr, size_t size){
 
 void fall_back_to_schedular(int signum){
 	printf("fall back to scheduler\n");
-    worker_yield();
+    int worker_status = worker_yield();
+    printf("worker_status: %d\n", worker_status);
 }
 
 void create_thread_timer(){
@@ -66,13 +89,13 @@ void create_thread_timer(){
 	timer.it_interval.tv_sec = 1;
 
 	timer.it_value.tv_usec = 0;
-	timer.it_value.tv_sec = 1;
-
+	timer.it_value.tv_sec = 1;  // TODO: QUantum variable
 	setitimer(ITIMER_PROF, &timer, NULL);
+    printf("Set timer function\n");
 }
 
 int _populate_thread_context(tcb* thread_tcb){
-    return getcontext(&(thread_tcb)->context) >= 0;
+    return getcontext(&thread_tcb->context) >= 0;
 }
 
 int _create_thread_context(tcb *thread_tcb, void *(*function)(void *), void *arg)
@@ -80,7 +103,6 @@ int _create_thread_context(tcb *thread_tcb, void *(*function)(void *), void *arg
     if(!_populate_thread_context(thread_tcb)){
         return 0;
     }
-
     thread_tcb->context.uc_link = NULL;
 
     if(!safe_malloc((void**)&(thread_tcb->context.uc_stack.ss_sp), STACK_SIZE)){
@@ -107,73 +129,88 @@ int _create_thread(tcb **thread_tcb_pointer, worker_t *thread_id){
         return 0;
     }
 
-    thread_tcb->thread_id = *thread_id;
+    thread_tcb->thread_id = *thread_id; // thread-id
     return 1;
 };
 
 /* create a new thread */
-int worker_create(worker_t *thread, pthread_attr_t *attr,
+int worker_create(worker_t *worker_thread_id, pthread_attr_t *attr,
                   void *(*function)(void *), void *arg)
 {
-    // - create Thread Control Block (TCB)
-    // - create and initialize the context of this worker thread
-    // - allocate space of stack for this thread to run
-    // after everything is set, push this thread into run queue and
-    // - make it ready for the execution.
-
-    // init thread queue
-    if (getThreadQueue() == NULL){
+    if(firstTimeWorkerThread){
+        tcb *main_thread;
+        worker_t main_thread_id = 0;
+        if(!_create_thread(&main_thread, &main_thread_id)){
+            return -1;
+        }
+        // main thread context is set by getcontext
+        setCurrentThread(main_thread);
+        // create thread runqueue
         queue_t *q = create_queue();
         setThreadQueue(q);
-    }
 
-    // init schedular only for the first time
-    if (getSchedularThread() == NULL){
+        // thread schedular config.
         tcb *schedular_thread;
-        if(!_create_thread(&schedular_thread, thread)){
-            return 0;
+        worker_t schedular_thread_id = 1;
+        if(!_create_thread(&schedular_thread, &schedular_thread_id)){
+            return -1;
         }
         // create thread context for worker thread.
         if(!_create_thread_context(schedular_thread, schedule_entry_point, NULL)){
-            return 0;
+            return -1;
         }
         setSchedularThread(schedular_thread);
         create_thread_timer();
+
+        firstTimeWorkerThread = 0;
     }
 
-    // worker thread
+    // worker thread. Just put it in the queue and don't do anything.
     tcb *worker_thread;
-    if(!_create_thread(&worker_thread, thread)){
-        return 0;
+    if(!_create_thread(&worker_thread, worker_thread_id)){
+        return -1;
     }
 
     // create thread context for worker thread.
     if(!_create_thread_context(worker_thread, function, arg)){
-        return 0;
+        return -1;
     }
-    setCurrentThread(worker_thread);
+
     enqueue(getThreadQueue(), worker_thread); 
-    return 1;
+    // printf("Vanilla worker thread run\n");
+    // setcontext(&getCurrentThread()->context);
+    return worker_thread->thread_id;
 };
 
 /* give CPU possession to other user-level worker threads voluntarily */
 int worker_yield()
-{
+{   
+    printf("In the worker yield function\n");
     // - change worker thread's state from Running to Ready
     // - save context of this thread to its thread control block
     // - switch from thread context to scheduler context
-    if (getCurrentThread() == NULL || getSchedularThread() == NULL){
+    if (getCurrentThread() == NULL){
+        printf("Current thread is null\n");
+        return 0;
+    }
+    if(getSchedularThread() == NULL){
+        printf("Schedular thread is null\n");
         return 0;
     }
     tcb* current_thread = getCurrentThread();
     tcb* schedular_thread = getSchedularThread();
 
-    current_thread->status = THREAD_READY;
+    current_thread->status = THREAD_READY; // interuppted thre
 
-    setCurrentThread(current_thread);
-    swapcontext(&(current_thread->context), &(schedular_thread->context));
-
-    return 0;
+    printf("Before going to schedular, the active thread id is: %d\n", current_thread->thread_id);
+    printf("Before swap context Current thread ID: %d status: %d\n",current_thread->thread_id, current_thread->status);
+    if (swapcontext(&(current_thread->context), &(schedular_thread->context)) < 0){
+        printf("Cannot exec anymore\n");
+        return 0;
+    }
+    printf("After swap context Current thread ID: %d status: %d\n",current_thread->thread_id, current_thread->status);
+    printf("Swap context called in worker_yield\n");
+    return 1;
 };
 
 /* terminate a thread */
@@ -189,7 +226,7 @@ void worker_exit(void *value_ptr){
 /* Wait for thread termination */
 int worker_join(worker_t thread, void **value_ptr)
 {
-
+    
     // - wait for a specific thread to terminate
     // - de-allocate any dynamic memory created by the joining thread
 
@@ -313,17 +350,37 @@ static void schedule() {
 
 // /* Pre-emptive Shortest Job First (POLICY_PSJF) scheduling algorithm */
 static void sched_psjf() {
-    if (getCurrentThread() != NULL){
-        enqueue(getThreadQueue(), getCurrentThread());
+    printf("Come back to schedular\n");
+    while(1){
+        printf("comaback\n");
+        if (getCurrentThread() != NULL){
+            printf("Enqueue running thread id: %d\n", getCurrentThread()->thread_id);
+            enqueue(getThreadQueue(), getCurrentThread());
+            // thread got interrupted. enqueue again.
+        }
+        printf("Finding next thread to schedule\n");
+        if(is_empty(getThreadQueue())){
+            printf("Main thread exited unexpectedly! Killing main process.");
+            exit(1); // completely destroys process
+        }
+        // worker thread exec.
+        if(!is_empty(getThreadQueue())){
+            tcb* thread_to_run = dequeue(getThreadQueue());
+            Threads_state ts = THREAD_RUNNING;
+            thread_to_run->status = ts; 
+            printf("Dequeued running thread id: %d\n", thread_to_run->thread_id);
+
+            setCurrentThread(thread_to_run);
+            printf("Swapping context to worker\n");
+            printf("Thread ID: %d\n", getCurrentThread()->thread_id);
+            if(swapcontext(&getSchedularThread()->context, &getCurrentThread()->context) < 0){
+                printf("Swap context failed\n");
+                return 0;
+            }
+            printf("After context swap\n");
+        }
     }
-    printf("Finding next thread to schedule\n");
-    if(!is_empty(getThreadQueue())){
-        tcb* thread_to_run = dequeue(getThreadQueue());
-        Threads_state ts = THREAD_RUNNING;
-        thread_to_run->status = ts;
-        setCurrentThread(thread_to_run);
-        swapcontext(&(getSchedularThread()->context), &(getCurrentThread())->context);
-    }
+    printf("I am at the end of the loop\n");
 }
 
 // /* Preemptive MLFQ scheduling algorithm */
@@ -346,19 +403,32 @@ void print_app_stats(void)
 
 // Feel free to add any other functions you need
 
-// YOUR CODE HERE
+// YOUR CODE HERE 
+
+// crt.o
 
 int main(int argc, char **argv)
 {
-    worker_t *tid_pointer = malloc(sizeof(worker_t));
-    *tid_pointer = 1;
+    worker_t *tid_pointer2 = malloc(sizeof(worker_t));
+    *tid_pointer2 = 2;
+    worker_t *tid_pointer3 = malloc(sizeof(worker_t));
+    *tid_pointer3 = 3;
+
     int *args = (int *)calloc(5, sizeof(int));
     args[1] = 2;
-    int tid = worker_create(tid_pointer, NULL, simplef, args);
-    printf("Created tid: %d\n", tid);
-    free(args);
-    free(tid_pointer);
 
+    int tid0 = worker_create(tid_pointer2, NULL, inf_loop, args);
+    int tid1 = worker_create(tid_pointer3, NULL, immediate_return, args);
+    
+    printf("Created tid: %d\n", tid0);
+    printf("Created tid: %d\n", tid1);
+    
+    free(args);
+    free(tid_pointer2);
+    free(tid_pointer3);
+    while(1);
+    printf("Reached this control block\n");
+    return EXIT_SUCCESS;
     // simulate timer.
     // create_thread_timer();
     // while(1);
