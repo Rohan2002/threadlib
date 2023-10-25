@@ -25,6 +25,33 @@ tcb *schedular_thread = NULL;
 queue_t *thread_queue = NULL;
 
 int firstTimeWorkerThread = 1;
+tcb *thread_table[MAX_THREADS];
+/* Find the TCB for the specified thread ID */
+tcb *find_tcb(worker_t thread_id)
+{
+    if (thread_id >= MAX_THREADS) {
+        return NULL;
+    }
+    return thread_table[thread_id];
+}
+
+/* Add a new thread to the thread table */
+void add_thread_to_thread_table(worker_t thread_id, tcb *tcb)
+{
+    if (thread_id >= MAX_THREADS) {
+        return;
+    }
+    thread_table[thread_id] = tcb;
+}
+
+/* Remove a thread from the thread table */
+void remove_thread_from_thread_table(worker_t thread_id)
+{
+    if (thread_id >= MAX_THREADS) {
+        return;
+    }
+    thread_table[thread_id] = NULL;
+}
 
 void *inf_loop(void *args)
 {
@@ -52,9 +79,9 @@ void *immediate_return(void *args)
     // return NULL;
     int count = 0;
     while(1){
-        // if (count == 10){
-        //     break;
-        // }
+        if (count == 10){
+            break;
+        }
         printf("count t2: %d\n", count++);
     }
     // while(1);
@@ -171,6 +198,8 @@ int worker_create(worker_t *worker_thread_id, pthread_attr_t *attr,
         return -1;
     }
 
+    //indexes the thread in the thread table so we can reference it with thread_id
+    thread_table[*worker_thread_id] = worker_thread;
     // create thread context for worker thread.
     if(!_create_thread_context(worker_thread, function, arg)){
         return -1;
@@ -231,6 +260,20 @@ int worker_join(worker_t thread, void **value_ptr)
     // - de-allocate any dynamic memory created by the joining thread
 
     // YOUR CODE HERE
+
+    /* Wait for thread termination */
+    tcb* thread_tcb;
+    // Find the TCB for the specified thread ID
+    thread_tcb = find_tcb(thread);
+
+    // Wait for the thread to terminate
+    while (thread_tcb->status != THREAD_FINISHED) {
+        worker_yield();
+    }
+
+    // Deallocate any dynamic memory created by the joining thread
+    worker_exit(thread_tcb);
+
     return 0;
 };
 
@@ -295,9 +338,10 @@ int worker_mutex_unlock(worker_mutex_t *mutex)
     if (!is_empty(mutex->block_list)) {
         // Move all threads from block list to run queue, they're ready to run
         while (!is_empty(mutex->block_list)) {
-            // tcb* next_thread = dequeue(mutex->block_list);
             // Add the thread to the ready queue, so scheduler can run it
-            //Ready Queue not implemented.
+            tcb* next_thread = dequeue(mutex->block_list);
+            enqueue(getThreadQueue(), next_thread); 
+
         }
     }
 
@@ -375,7 +419,7 @@ static void sched_psjf() {
             printf("Thread ID: %d\n", getCurrentThread()->thread_id);
             if(swapcontext(&getSchedularThread()->context, &getCurrentThread()->context) < 0){
                 printf("Swap context failed\n");
-                return 0;
+                return;
             }
             printf("After context swap\n");
         }
@@ -429,6 +473,8 @@ int main(int argc, char **argv)
     while(1);
     printf("Reached this control block\n");
     return EXIT_SUCCESS;
+
+
     // simulate timer.
     // create_thread_timer();
     // while(1);

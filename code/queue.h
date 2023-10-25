@@ -1,6 +1,7 @@
 #ifndef QUEUE_H
 #define QUEUE_H
 
+
 // Node structure for the queue
 typedef struct node
 {

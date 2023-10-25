@@ -8,7 +8,7 @@
 #define WORKER_T_H
 
 #define _GNU_SOURCE
-
+#define MAX_THREADS 1024
 /* To use Linux pthread Library in Benchmark, you have to comment the USE_WORKERS macro */
 #define USE_WORKERS 1
 
@@ -22,7 +22,7 @@
 #include <signal.h>
 #include "queue.h"
 
-typedef uint worker_t;
+typedef unsigned int worker_t;
 
 // util functions
 int safe_malloc(void** ptr, size_t size);
@@ -52,6 +52,12 @@ typedef struct TCB {
 	Threads_state status;
 	int priority;
 } tcb; 
+
+typedef uint worker_t;
+
+extern tcb *thread_table[MAX_THREADS];
+
+
 int _populate_thread_context(tcb* thread_tcb);
 int _create_thread_context(tcb *thread_tcb, void *(*function)(void *), void *arg);
 int _create_thread(tcb **thread_tcb_pointer, worker_t *thread_id);
