@@ -64,6 +64,9 @@ void *inf_loop(void *args)
     // return NULL;
     int count = 0;
     while(1){
+        if (count == 10){
+            break;
+        }
         printf("count t1: %d\n", count++);
     }
     return NULL;
@@ -84,7 +87,6 @@ void *immediate_return(void *args)
         }
         printf("count t2: %d\n", count++);
     }
-    // while(1);
     return NULL;
 }
 
@@ -99,8 +101,11 @@ int safe_malloc(void** ptr, size_t size){
 
 void fall_back_to_schedular(int signum){
 	printf("fall back to scheduler\n");
-    int worker_status = worker_yield();
-    printf("worker_status: %d\n", worker_status);
+    if (worker_yield() < 1){
+        // handle error
+        perror("Failed to swap context with worker thread.");
+        exit(1);
+    }
 }
 
 void create_thread_timer(){
@@ -125,12 +130,17 @@ int _populate_thread_context(tcb* thread_tcb){
     return getcontext(&thread_tcb->context) >= 0;
 }
 
-int _create_thread_context(tcb *thread_tcb, void *(*function)(void *), void *arg)
+int _create_thread_context(tcb *thread_tcb, void *(*function)(void *), void *arg, ucontext_t* next_context)
 {
     if(!_populate_thread_context(thread_tcb)){
         return 0;
     }
-    thread_tcb->context.uc_link = NULL;
+    if (next_context != NULL){
+        thread_tcb->context.uc_link = next_context;
+    }
+    else{
+        thread_tcb->context.uc_link = NULL;
+    }
 
     if(!safe_malloc((void**)&(thread_tcb->context.uc_stack.ss_sp), STACK_SIZE)){
         return 0;
@@ -166,7 +176,7 @@ int worker_create(worker_t *worker_thread_id, pthread_attr_t *attr,
 {
     if(firstTimeWorkerThread){
         tcb *main_thread;
-        worker_t main_thread_id = 0;
+        worker_t main_thread_id = MAIN_THREAD_ID;
         if(!_create_thread(&main_thread, &main_thread_id)){
             return -1;
         }
@@ -178,12 +188,12 @@ int worker_create(worker_t *worker_thread_id, pthread_attr_t *attr,
 
         // thread schedular config.
         tcb *schedular_thread;
-        worker_t schedular_thread_id = 1;
+        worker_t schedular_thread_id = SCHEDULAR_THREAD_ID;
         if(!_create_thread(&schedular_thread, &schedular_thread_id)){
             return -1;
         }
         // create thread context for worker thread.
-        if(!_create_thread_context(schedular_thread, schedule_entry_point, NULL)){
+        if(!_create_thread_context(schedular_thread, schedule_entry_point, NULL, NULL)){
             return -1;
         }
         setSchedularThread(schedular_thread);
@@ -201,7 +211,7 @@ int worker_create(worker_t *worker_thread_id, pthread_attr_t *attr,
     //indexes the thread in the thread table so we can reference it with thread_id
     thread_table[*worker_thread_id] = worker_thread;
     // create thread context for worker thread.
-    if(!_create_thread_context(worker_thread, function, arg)){
+    if(!_create_thread_context(worker_thread, function, arg, &getCurrentThread()->context)){
         return -1;
     }
 
@@ -229,16 +239,20 @@ int worker_yield()
     tcb* current_thread = getCurrentThread();
     tcb* schedular_thread = getSchedularThread();
 
-    current_thread->status = THREAD_READY; // interuppted thre
-
-    printf("Before going to schedular, the active thread id is: %d\n", current_thread->thread_id);
-    printf("Before swap context Current thread ID: %d status: %d\n",current_thread->thread_id, current_thread->status);
+    current_thread->status = THREAD_READY; // interuppted there
+    setCurrentThread(current_thread);
+    printf("Before swap context to schedular Current thread ID: %d status: %d\n",getCurrentThread()->thread_id, getCurrentThread()->status);
     if (swapcontext(&(current_thread->context), &(schedular_thread->context)) < 0){
         printf("Cannot exec anymore\n");
         return 0;
     }
-    printf("After swap context Current thread ID: %d status: %d\n",current_thread->thread_id, current_thread->status);
-    printf("Swap context called in worker_yield\n");
+    // if worker thread comes to this EIP then it finished execution.
+    // setCurrentThread(current_thread);
+    current_thread = getCurrentThread();
+    if (current_thread->thread_id != MAIN_THREAD_ID){
+        current_thread->status = THREAD_FINISHED;
+    }
+    printf("After swap context Current thread ID: %d status: %d\n",getCurrentThread()->thread_id, getCurrentThread()->status);
     return 1;
 };
 
@@ -393,10 +407,9 @@ static void schedule() {
 }
 
 // /* Pre-emptive Shortest Job First (POLICY_PSJF) scheduling algorithm */
-static void sched_psjf() {
+static int sched_psjf() {
     printf("Come back to schedular\n");
     while(1){
-        printf("comaback\n");
         if (getCurrentThread() != NULL){
             printf("Enqueue running thread id: %d\n", getCurrentThread()->thread_id);
             enqueue(getThreadQueue(), getCurrentThread());
@@ -415,16 +428,14 @@ static void sched_psjf() {
             printf("Dequeued running thread id: %d\n", thread_to_run->thread_id);
 
             setCurrentThread(thread_to_run);
-            printf("Swapping context to worker\n");
-            printf("Thread ID: %d\n", getCurrentThread()->thread_id);
+            printf("Swapping context to thread id: %d\n", getCurrentThread()->thread_id);
             if(swapcontext(&getSchedularThread()->context, &getCurrentThread()->context) < 0){
                 printf("Swap context failed\n");
-                return;
+                return -1;
             }
             printf("After context swap\n");
         }
     }
-    printf("I am at the end of the loop\n");
 }
 
 // /* Preemptive MLFQ scheduling algorithm */

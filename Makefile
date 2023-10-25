@@ -1,6 +1,6 @@
 CC         = gcc
 SANITIZERS = -fsanitize=address,undefined
-CFLAGS     = -g -Wall -Wvla -pthread
+CFLAGS     = -g -Wall -Wvla -pthread -Werror
 
 SRC_DIR = code
 
