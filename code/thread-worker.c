@@ -199,6 +199,9 @@ int worker_create(worker_t *worker_thread_id, pthread_attr_t *attr,
         setSchedularThread(schedular_thread);
         create_thread_timer();
 
+        add_thread_to_thread_table(main_thread_id, main_thread);
+        add_thread_to_thread_table(schedular_thread_id, schedular_thread);
+        
         firstTimeWorkerThread = 0;
     }
 
@@ -207,15 +210,13 @@ int worker_create(worker_t *worker_thread_id, pthread_attr_t *attr,
     if(!_create_thread(&worker_thread, worker_thread_id)){
         return -1;
     }
-
-    //indexes the thread in the thread table so we can reference it with thread_id
-    thread_table[*worker_thread_id] = worker_thread;
     // create thread context for worker thread.
     if(!_create_thread_context(worker_thread, function, arg, &getCurrentThread()->context)){
         return -1;
     }
 
-    enqueue(getThreadQueue(), worker_thread); 
+    enqueue(getThreadQueue(), worker_thread);
+    add_thread_to_thread_table(*worker_thread_id, worker_thread); 
     // printf("Vanilla worker thread run\n");
     // setcontext(&getCurrentThread()->context);
     return worker_thread->thread_id;
@@ -246,8 +247,6 @@ int worker_yield()
         printf("Cannot exec anymore\n");
         return 0;
     }
-    // if worker thread comes to this EIP then it finished execution.
-    // setCurrentThread(current_thread);
     current_thread = getCurrentThread();
     if (current_thread->thread_id != MAIN_THREAD_ID){
         current_thread->status = THREAD_FINISHED;
@@ -279,10 +278,12 @@ int worker_join(worker_t thread, void **value_ptr)
     tcb* thread_tcb;
     // Find the TCB for the specified thread ID
     thread_tcb = find_tcb(thread);
-
+    if (thread_tcb == NULL){
+        return 0;
+    }
     // Wait for the thread to terminate
     while (thread_tcb->status != THREAD_FINISHED) {
-        worker_yield();
+        swapcontext(&thread_tcb->context, &getSchedularThread()->context);
     }
 
     // Deallocate any dynamic memory created by the joining thread
@@ -425,6 +426,7 @@ static int sched_psjf() {
             tcb* thread_to_run = dequeue(getThreadQueue());
             Threads_state ts = THREAD_RUNNING;
             thread_to_run->status = ts; 
+
             printf("Dequeued running thread id: %d\n", thread_to_run->thread_id);
 
             setCurrentThread(thread_to_run);
@@ -475,6 +477,7 @@ int main(int argc, char **argv)
     int tid0 = worker_create(tid_pointer2, NULL, inf_loop, args);
     int tid1 = worker_create(tid_pointer3, NULL, immediate_return, args);
     
+    worker_join(tid0, )
     printf("Created tid: %d\n", tid0);
     printf("Created tid: %d\n", tid1);
     
