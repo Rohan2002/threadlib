@@ -1,17 +1,25 @@
 CC         = gcc
 SANITIZERS = -fsanitize=address,undefined
-CFLAGS     = -g -Wall -Wvla -pthread -Werror $(SANITIZERS)
+CFLAGS     = -g -Wall -Wvla -pthread
 
-all: bin/ bin/tw
+SRC_DIR = code
 
-bin/tw:
-	$(CC) $(CFLAGS) code/thread-worker.c -o $@
+all: bin/tw
 
-bin/testtw:
-	$(CC) $(CFLAGS) code/thread-test.c -o $@
+bin/tw: bin/ obj/thread-worker.o obj/queue.o
+	$(CC) $(CFLAGS) obj/thread-worker.o obj/queue.o -o $@
+
+obj/thread-worker.o: obj/  $(SRC_DIR)/thread-worker.c  $(SRC_DIR)/thread-worker.h
+	$(CC) $(CFLAGS)  $(SRC_DIR)/thread-worker.c -c -o $@
+
+obj/queue.o: obj/  $(SRC_DIR)/queue.c  $(SRC_DIR)/queue.h
+	$(CC) $(CFLAGS)  $(SRC_DIR)/queue.c -c -o $@
+
+obj/:
+	mkdir -p $@
 
 bin/:
 	mkdir -p $@
 
 clean:
-	rm -r bin
+	rm -r bin obj

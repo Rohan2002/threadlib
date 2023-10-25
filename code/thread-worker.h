@@ -19,14 +19,22 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <ucontext.h>
+#include <signal.h>
+#include "queue.h"
 
 typedef uint worker_t;
+
+// util functions
+int safe_malloc(void** ptr, size_t size);
+
+// thread variables and data structures.
+int QUANTUM = 1; // seconds
 typedef enum {
     THREAD_READY,
     THREAD_RUNNING,
     THREAD_BLOCKED,
     THREAD_FINISHED 
-} thread_status;
+} Threads_state;
 
 typedef struct TCB {
 	/* add important states in a thread control block */
@@ -41,21 +49,13 @@ typedef struct TCB {
 	worker_t thread_id;
 	ucontext_t context;
 	void* stack;
-	thread_status status;
+	Threads_state status;
 	int priority;
 } tcb; 
-
-// Node structure for the queue
-typedef struct node {
-    int data; // Change this type if you need to store something else
-    struct node* next;
-} node_t;
-
-// Queue structure
-typedef struct queue {
-    node_t* front; // Points to the front node in the queue
-    node_t* rear;  // Points to the rear node in the queue
-} queue_t;
+int _populate_thread_context(tcb* thread_tcb);
+int _create_thread_context(tcb *thread_tcb, void *(*function)(void *), void *arg);
+int _create_thread(tcb **thread_tcb_pointer, worker_t *thread_id);
+void create_thread_timer();
 
 /* mutex struct definition */
 typedef struct worker_mutex_t {
@@ -70,25 +70,14 @@ typedef struct worker_mutex_t {
 } worker_mutex_t;
 
 
-/* define your data structures here: */
-// Feel free to add your own auxiliary data structures (linked list or queue etc...)
-
-// YOUR CODE HERE
-
+void setCurrentThread(tcb* thread_exec);
 tcb* getCurrentThread();
 
-/* Function Declarations: */
+void setSchedularThread(tcb* thread_exec);
+tcb* getSchedularThread();
 
-//for implementing Queue data structure
-
-queue_t* create_queue();
-void enqueue(queue_t* q, int value);
-int dequeue(queue_t* q);
-int is_empty(queue_t* q);
-int front(queue_t* q);
-void destroy_queue(queue_t* q);
-
-
+void setThreadQueue(queue_t* q);
+queue_t* getThreadQueue();
 
 /* create a new thread */
 int worker_create(worker_t * thread, pthread_attr_t * attr, void
@@ -116,6 +105,11 @@ int worker_mutex_unlock(worker_mutex_t *mutex);
 /* destroy the mutex */
 int worker_mutex_destroy(worker_mutex_t *mutex);
 
+/* Scheduler */
+typedef struct sigaction signal_type;
+void *schedule_entry_point(void* args);
+static void schedule();
+static void sched_psjf();
 
 /* Function to print global statistics. Do not modify this function.*/
 void print_app_stats(void);
