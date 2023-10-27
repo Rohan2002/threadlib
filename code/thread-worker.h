@@ -15,6 +15,7 @@
 #define MAIN_THREAD_ID 0
 #define SCHEDULAR_THREAD_ID 1
 
+#define ERROR_CODE 0
 
 /* include lib header files that you need here: */
 #include <unistd.h>
@@ -55,6 +56,7 @@ typedef struct TCB {
 	void* stack;
 	Threads_state status;
 	int priority;
+	void* ret_val;
 } tcb; 
 
 typedef uint worker_t;
@@ -63,7 +65,7 @@ extern tcb *thread_table[MAX_THREADS];
 
 
 int _populate_thread_context(tcb* thread_tcb);
-int _create_thread_context(tcb *thread_tcb, void *(*function)(void *), void *arg, ucontext_t* ucontext_t);
+int _create_thread_context(tcb *thread_tcb, void *(*function)(void *), void *arg);
 int _create_thread(tcb **thread_tcb_pointer, worker_t *thread_id);
 void create_thread_timer();
 
@@ -88,6 +90,8 @@ tcb* getSchedularThread();
 
 void setThreadQueue(queue_t* q);
 queue_t* getThreadQueue();
+
+int thread_finished(tcb* thread);
 
 /* create a new thread */
 int worker_create(worker_t * thread, pthread_attr_t * attr, void
