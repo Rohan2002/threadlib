@@ -86,7 +86,7 @@ int safe_malloc(void **ptr, size_t size)
 
 void fall_back_to_schedular(int signum)
 {
-    printf("fall back to scheduler\n");
+    // printf("fall back to scheduler\n");
     if (worker_yield() < 1)
     {
         // handle error
@@ -276,7 +276,7 @@ int worker_yield()
      *
      * change context from worker thread to schedular thread.
      */
-    printf("Entered the worker yield function\n");
+    // printf("Entered the worker yield function\n");
     if (getCurrentThread() == NULL)
     {
         printf("Current thread is null\n");
@@ -296,13 +296,13 @@ int worker_yield()
     }
 
     // setCurrentThread(current_thread);
-    printf("Before swap context to schedular Current thread ID: %d status: %d\n", getCurrentThread()->thread_id, getCurrentThread()->status);
+    // printf("Before swap context to schedular Current thread ID: %d status: %d\n", getCurrentThread()->thread_id, getCurrentThread()->status);
     if (swapcontext(&(current_thread->context), &(schedular_thread->context)) < 0)
     {
         printf("Cannot exec anymore\n");
         return ERROR_CODE;
     }
-    printf("Swapping context back to the main thread\n");
+    // printf("Swapping context back to the main thread\n");
     return 1;
 };
 
@@ -453,6 +453,7 @@ void *schedule_entry_point(void *args)
 
 static void schedule()
 {
+    // sched_psjf();
     sched_mlfq();
     // - every time a timer interrupt occurs, your worker thread library
     // should be contexted switched from a thread context to this
@@ -475,7 +476,7 @@ static void schedule()
     // #endif
 }
 
-// /* Pre-emptive Shortest Job First (POLICY_PSJF) scheduling algorithm */
+/* Pre-emptive Shortest Job First (POLICY_PSJF) scheduling algorithm */
 // static int sched_psjf()
 // {
 //     printf("Come back to schedular\n");
@@ -521,47 +522,50 @@ static void schedule()
 
 
 #define NUM_PRIORITY_LEVELS 4
-#define TIME_SLICE 100 // in milliseconds
+#define TIME_QUANTUM 100
 
 /* Preemptive MLFQ scheduling algorithm */
-static int sched_mlfq() {
-	// - your own implementation of MLFQ
-	// (feel free to modify arguments and return types)
+static int sched_mlfq()
+{
+    printf("Come back to scheduler\n");
 
-	// YOUR CODE HERE
-    int time_since_last_promotion = 0;
+    // Define multiple priority levels
     queue_t *thread_queues[NUM_PRIORITY_LEVELS];
-    for (int i=0; i<NUM_PRIORITY_LEVELS; i++) {
+    for (int i = 0; i < NUM_PRIORITY_LEVELS; i++) {
         thread_queues[i] = create_queue();
     }
-    while(1)
+
+    int time_since_last_promotion = 0;
+
+    while (1)
     {
-        if (getCurrentThread() != NULL && getCurrentThread()->status != THREAD_FINISHED)
+        // Check if current thread is finished or interrupted
+        if (getCurrentThread() != NULL && !thread_finished(getCurrentThread()))
         {
             // Enqueue thread in appropriate priority level
             int priority = getCurrentThread()->priority;
             enqueue(thread_queues[priority], getCurrentThread());
         }
 
-        tcb* thread_to_run = NULL;
-
-        //determine the next thread to run by iterating through the queues
-        for(int i=0; i<NUM_PRIORITY_LEVELS; i++)
-        {
-            if (!is_empty(thread_queues[i]))
-            {
+        // Find next thread to schedule
+        printf("Finding next thread to schedule\n");
+        tcb *thread_to_run = NULL;
+        for (int i = 0; i < NUM_PRIORITY_LEVELS; i++) {
+            if (!is_empty(thread_queues[i])) {
                 thread_to_run = dequeue(thread_queues[i]);
                 break;
             }
-        }   
-         // If no threads are ready to run, exit (There should always be a main thread)
+        }
+
+        // If no threads are ready to run, exit
         if (thread_to_run == NULL) {
             printf("Main thread exited unexpectedly! Killing main process.");
             exit(1);
         }
 
-        // Set the thread to running
-        thread_to_run->status = THREAD_RUNNING;
+        // Set thread status to running
+        Threads_state ts = THREAD_RUNNING;
+        thread_to_run->status = ts;
 
         // Swap context to next thread
         setCurrentThread(thread_to_run);
@@ -574,15 +578,14 @@ static int sched_mlfq() {
         if (swapcontext(&getSchedularThread()->context, &getCurrentThread()->context) < 0)
         {
             printf("Swap context failed\n");
-            exit(ERROR_CODE);
+            return ERROR_CODE;
         }
         printf("After context swap\n");
 
         // Update time since last promotion
-        time_since_last_promotion += TIME_SLICE;
+        time_since_last_promotion += TIME_QUANTUM;
 
-        //aging (Rule 4)
-        // If a thread has been waiting for more than 500ms, it should be promoted to a higher priority level
+        // Implement aging
         if (time_since_last_promotion >= 500) {
             for (int i = 1; i < NUM_PRIORITY_LEVELS; i++) {
                 tcb *thread = NULL;
@@ -596,9 +599,8 @@ static int sched_mlfq() {
         }
 
         // Implement preemption
-        // If a thread has been running for more than 1000ms, it should be preempted
-        if (getCurrentThread() != NULL && getCurrentThread()->time_slice >= TIME_SLICE) {
-            getCurrentThread()->time_slice = 0;
+        if (getCurrentThread() != NULL && getCurrentThread()->time_running >= TIME_QUANTUM) {
+            getCurrentThread()->time_running = 0;
             int priority = getCurrentThread()->priority;
             if (priority < NUM_PRIORITY_LEVELS - 1) {
                 enqueue(thread_queues[priority+1], getCurrentThread());
@@ -608,27 +610,11 @@ static int sched_mlfq() {
             thread_to_run = NULL;
         }
 
-        // Implement demotion
-        // If a thread has been running for more than 1000ms, it should be demoted to a lower priority level
-        if (getCurrentThread() != NULL && getCurrentThread()->time_running >= 1000) {
-            getCurrentThread()->time_running = 0;
-            int priority = getCurrentThread()->priority;
-            if (priority > 0) {
-                enqueue(thread_queues[priority-1], getCurrentThread());
-            } else {
-                enqueue(thread_queues[priority], getCurrentThread());
-            }
-            thread_to_run = NULL;
-        }
-
-        // Update time slice and time running for current thread
+        // Update time running for current thread
         if (getCurrentThread() != NULL) {
-            getCurrentThread()->time_slice += TIME_SLICE;
-            getCurrentThread()->time_running += TIME_SLICE;
+            getCurrentThread()->time_running += TIME_QUANTUM;
         }
-
     }
-    return 0;
 }
 
 // DO NOT MODIFY THIS FUNCTION
