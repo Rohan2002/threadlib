@@ -17,6 +17,9 @@
 
 #define ERROR_CODE 0
 
+#define QUANTUM 1
+
+# define DEBUG 0
 /* include lib header files that you need here: */
 #include <unistd.h>
 #include <sys/syscall.h>
@@ -33,7 +36,6 @@ typedef unsigned int worker_t;
 int safe_malloc(void** ptr, size_t size);
 
 // thread variables and data structures.
-int QUANTUM = 1; // seconds
 typedef enum {
     THREAD_READY,
     THREAD_RUNNING,

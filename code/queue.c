@@ -66,8 +66,12 @@ void* dequeue(queue_t *q)
 // Function to check if the queue is empty
 int is_empty(queue_t *q)
 {
+    if(q == NULL){
+        printf("Queue is null\n");
+    }
     return q->front == NULL;
 }
+
 
 // Function to get the front of the queue
 void* front(queue_t *q)
