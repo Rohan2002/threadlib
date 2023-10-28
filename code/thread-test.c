@@ -57,79 +57,71 @@ void entry_point() {
     int arg2 = 20;
     my_function(arg1, arg2);
 }
+int main(int argc, char **argv)
+{
+    int thread_num = 5;
+    int i = 0;
 
-int main() {
-    int a = 0;
-    if (!a){
-        perror("Error\n");
+    int mutex_init = worker_mutex_init(&thread_mutex, NULL);
+    if (!mutex_init)
+    {
+        perror("Failed to create mutex\n");
     }
+
+    worker_t *thread = (worker_t *)malloc(thread_num * sizeof(worker_t));
+
+    for (i = 0; i < thread_num; ++i)
+    {
+        thread[i] = i;
+        int tid = worker_create(&thread[i], NULL, add_counter, NULL);
+        printf("Created thread id: %d\n", tid);
+    }
+    // printf("Current thread id: %d\n", getCurrent)
+    // worker_create(&thread[0], NULL, add_counter, NULL);
+    // worker_create(&thread[1], NULL, add_counter, NULL);
+
+    for (i = 0; i < thread_num; ++i)
+    {
+        worker_join(thread[i], NULL);
+    }
+
+    // worker_t *tid_pointer2 = malloc(sizeof(worker_t));
+    // *tid_pointer2 = 2;
+    // worker_t *tid_pointer3 = malloc(sizeof(worker_t));
+    // *tid_pointer3 = 3;
+
+    // int *i1 = malloc(sizeof(int));
+    // int *i2 = malloc(sizeof(int));
+    // *i1 = 4;
+    // *i2 = 5;
+    // int tid0 = worker_create(tid_pointer2, NULL, add_counter, NULL);
+    // int tid1 = worker_create(tid_pointer3, NULL, add_counter, NULL);
+
+    // // int tid0 = worker_create(tid_pointer2, NULL, inf_loop, i1);
+    // // int tid1 = worker_create(tid_pointer3, NULL, inf_loop, i2);
+
+    // printf("Created tid: %d\n", tid0);
+    // printf("Created tid: %d\n", tid1);
+
+    // // void *tid0_ret = malloc(sizeof(int));
+    // // void *tid1_ret = malloc(sizeof(int));
+
+    // worker_join(tid0, NULL);
+    // worker_join(tid1, NULL);
+
+    // printf("Main thread tid0 ret val: %d\n", *(int *)tid0_ret);
+    // printf("Main thread tid0 ret val: %d\n", *(int *)tid1_ret);
+    // printf("The thread X value: %d\n", x);
+
+    // // while (1);
+    // free(args);
+    // free(tid_pointer2);
+    // free(tid_pointer3);
+
+    // printf("Reached this control block\n");
+    // return EXIT_SUCCESS;
+
+    // // simulate timer.
+    // // create_thread_timer();
+    // // while(1);
 }
-
-// int main(int argc, char **argv)
-// {
-//     int thread_num = 5;
-//     int i = 0;
-
-//     int mutex_init = worker_mutex_init(&thread_mutex, NULL);
-//     if (!mutex_init)
-//     {
-//         perror("Failed to create mutex\n");
-//     }
-
-//     worker_t *thread = (worker_t *)malloc(thread_num * sizeof(worker_t));
-
-//     for (i = 0; i < thread_num; ++i)
-//     {
-//         thread[i] = i;
-//         int tid = worker_create(&thread[i], NULL, threadFunction, NULL);
-//         printf("Created thread id: %d\n", tid);
-//     }
-//     // printf("Current thread id: %d\n", getCurrent)
-//     // worker_create(&thread[0], NULL, add_counter, NULL);
-//     // worker_create(&thread[1], NULL, add_counter, NULL);
-
-//     for (i = 0; i < thread_num; ++i)
-//     {
-//         worker_join(thread[i], NULL);
-//     }
-
-//     // worker_t *tid_pointer2 = malloc(sizeof(worker_t));
-//     // *tid_pointer2 = 2;
-//     // worker_t *tid_pointer3 = malloc(sizeof(worker_t));
-//     // *tid_pointer3 = 3;
-
-//     // int *i1 = malloc(sizeof(int));
-//     // int *i2 = malloc(sizeof(int));
-//     // *i1 = 4;
-//     // *i2 = 5;
-//     // int tid0 = worker_create(tid_pointer2, NULL, add_counter, NULL);
-//     // int tid1 = worker_create(tid_pointer3, NULL, add_counter, NULL);
-
-//     // // int tid0 = worker_create(tid_pointer2, NULL, inf_loop, i1);
-//     // // int tid1 = worker_create(tid_pointer3, NULL, inf_loop, i2);
-
-//     // printf("Created tid: %d\n", tid0);
-//     // printf("Created tid: %d\n", tid1);
-
-//     // // void *tid0_ret = malloc(sizeof(int));
-//     // // void *tid1_ret = malloc(sizeof(int));
-
-//     // worker_join(tid0, NULL);
-//     // worker_join(tid1, NULL);
-
-//     // printf("Main thread tid0 ret val: %d\n", *(int *)tid0_ret);
-//     // printf("Main thread tid0 ret val: %d\n", *(int *)tid1_ret);
-//     // printf("The thread X value: %d\n", x);
-
-//     // // while (1);
-//     // free(args);
-//     // free(tid_pointer2);
-//     // free(tid_pointer3);
-
-//     // printf("Reached this control block\n");
-//     // return EXIT_SUCCESS;
-
-//     // // simulate timer.
-//     // // create_thread_timer();
-//     // // while(1);
-// }
