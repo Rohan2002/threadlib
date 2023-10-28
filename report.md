@@ -23,12 +23,11 @@ The worker_mutex_init() function is used to setup the datastructure for the mute
 - owner field, to assign a thread as the mutex's owner, and to prevent any other thread from accessing the locked resource
 - blocked_list, which holds the list of threads that are blocked from accessing the resource
 
+worker_mutex_lock() is the function to lock the mutex, apart from setting the mutex status to lock, we used the linux atmoic function "__sync_lock_test_and_set" to set up the lock. At the same time, any other threads attempting to access the locked resource will have its status changed to "BLOCKED" and throw into the mutex->block_list queue, waiting to be called once the resource is unlocked
 
+worker_mutex_unlock() is the reverse of the above mentioned process and used "__sync_lock_release" to release the lock, distributing every blocked thread back to the scheduler
 
-
-#### Mutex Initialization & Destroy
-
-#### Lock and Unlock
+worker_mutex_destroy() will free the mutex only when its initialized and unlocked. it will also free the entire queue associated.
 
 ## Part 2. Scheduler
 
