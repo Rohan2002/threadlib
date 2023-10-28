@@ -5,8 +5,9 @@ Jinyue (Eric) Liu (jl2661)
 
 ## Compile Steps
 
-Run ```make``` to compile binaries. Binaries are stored in the bin/ folder.
-Run ```make clean``` to clean build. 
+Run ```make SCHED=PSJF``` inside the code directory to compile the static threadlibrary. 
+
+Go to benchmark folder and follow the steps in the README.md file provided initially.
 
 ## Part 1. Thread Library
 
