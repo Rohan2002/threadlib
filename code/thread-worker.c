@@ -477,52 +477,52 @@ static void schedule()
 }
 
 /* Pre-emptive Shortest Job First (POLICY_PSJF) scheduling algorithm */
-// static int sched_psjf()
-// {
-//     printf("Come back to schedular\n");
-//     while (1)
-//     {
-//         if (getCurrentThread() != NULL && !thread_finished(getCurrentThread()))
-//         {
-//             printf("Enqueue running thread id: %d\n", getCurrentThread()->thread_id);
-//             enqueue(getThreadQueue(), getCurrentThread());
-//             // thread got interrupted. enqueue again.
-//         }
-//         printf("Finding next thread to schedule\n");
-//         if (is_empty(getThreadQueue()))
-//         {
-//             printf("Main thread exited unexpectedly! Killing main process.");
-//             exit(1); // completely destroys process
-//         }
-//         // worker thread exec.
-//         if (!is_empty(getThreadQueue()))
-//         {
-//             tcb *thread_to_run = dequeue(getThreadQueue());
-//             Threads_state ts = THREAD_RUNNING;
-//             thread_to_run->status = ts;
+static int sched_psjf()
+{
+    printf("Come back to schedular\n");
+    while (1)
+    {
+        if (getCurrentThread() != NULL && !thread_finished(getCurrentThread()))
+        {
+            printf("Enqueue running thread id: %d\n", getCurrentThread()->thread_id);
+            enqueue(getThreadQueue(), getCurrentThread());
+            // thread got interrupted. enqueue again.
+        }
+        printf("Finding next thread to schedule\n");
+        if (is_empty(getThreadQueue()))
+        {
+            printf("Main thread exited unexpectedly! Killing main process.");
+            exit(1); // completely destroys process
+        }
+        // worker thread exec.
+        if (!is_empty(getThreadQueue()))
+        {
+            tcb *thread_to_run = dequeue(getThreadQueue());
+            Threads_state ts = THREAD_RUNNING;
+            thread_to_run->status = ts;
 
-//             printf("Dequeued running thread id: %d\n", thread_to_run->thread_id);
+            printf("Dequeued running thread id: %d\n", thread_to_run->thread_id);
 
-//             setCurrentThread(thread_to_run);
-//             printf("Swapping context to thread id: %d\n", getCurrentThread()->thread_id);
-//             if (getCurrentThread()->thread_id == MAIN_THREAD_ID)
-//             {
-//                 printf("&getCurrentThread()->context: {%p}\n", &getCurrentThread()->context);
-//                 setcontext(&getCurrentThread()->context);
-//             }
-//             if (swapcontext(&getSchedularThread()->context, &getCurrentThread()->context) < 0)
-//             {
-//                 printf("Swap context failed\n");
-//                 return ERROR_CODE;
-//             }
-//             printf("After context swap\n");
-//         }
-//     }
-// }
+            setCurrentThread(thread_to_run);
+            printf("Swapping context to thread id: %d\n", getCurrentThread()->thread_id);
+            if (getCurrentThread()->thread_id == MAIN_THREAD_ID)
+            {
+                printf("&getCurrentThread()->context: {%p}\n", &getCurrentThread()->context);
+                setcontext(&getCurrentThread()->context);
+            }
+            if (swapcontext(&getSchedularThread()->context, &getCurrentThread()->context) < 0)
+            {
+                printf("Swap context failed\n");
+                return ERROR_CODE;
+            }
+            printf("After context swap\n");
+        }
+    }
+}
 
 
 #define NUM_PRIORITY_LEVELS 4
-#define TIME_QUANTUM 100
+#define TIME_QUANTUM 1
 
 /* Preemptive MLFQ scheduling algorithm */
 static int sched_mlfq()
@@ -599,6 +599,7 @@ static int sched_mlfq()
         }
 
         // Implement preemption
+        // If thread has run for TIME_QUANTUM, demote it to the next priority level
         if (getCurrentThread() != NULL && getCurrentThread()->time_running >= TIME_QUANTUM) {
             getCurrentThread()->time_running = 0;
             int priority = getCurrentThread()->priority;

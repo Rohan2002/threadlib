@@ -57,7 +57,6 @@ typedef struct TCB {
 	Threads_state status;
 	int priority;
 	void* ret_val;
-	int time_slice;
 	int time_running;
 } tcb; 
 
