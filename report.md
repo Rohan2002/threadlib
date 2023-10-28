@@ -12,9 +12,22 @@ Run ```make clean``` to clean build.
 
 ### Thread creation 
 
+Worker_Create will also be responsible for setting up the scheduler/main context the first time it is invoked, we used a global variable to track this initialization process. Afterward we will initialize a new thread and put it inside the runqueue waiting for execution.
+
 ### Thread yield
 
+The function first checks if there is a current thread and a scheduler thread. If either of these threads is NULL, the function returns an error code.
+
+If there is a current thread, the function sets its status to THREAD_READY if it has not finished executing.
+
+The function then swaps the context from the current thread to the scheduler thread using the swapcontext() function. This effectively yields the current thread and switches to the scheduler thread.
+
+After the context switch is complete, the function returns 1 to indicate success.
+
+
 ### Thread join
+
+The input of the thread join will be the thread we wait for to finish, while we are waiting, we will yield to the scheduler to make other functions 
 
 ### Mutexes
 The worker_mutex_init() function is used to setup the datastructure for the mutex, they include
@@ -33,7 +46,27 @@ worker_mutex_destroy() will free the mutex only when its initialized and unlocke
 
 ### PSJF Scheduler
 
+the Preemptive Shortest Job First (PSJF) scheduling algorithm in thread-worker.c.
+
+The function first checks if there is a current thread and if it has finished executing or is blocked. If the current thread is still running, it is enqueued in the thread queue.
+
+The function then dequeues the next thread to execute from the thread queue based on its remaining burst time. If the thread queue is empty, the function exits the program.
+
+The dequeued thread is set to THREAD_RUNNING status and its response time is computed if it has not been run before. The function then swaps the context to the dequeued thread using swapcontext().
+
+After the context switch is complete, the function returns to the scheduler thread, which enqueues the current thread if it is still running and repeats the process of dequeuing the next thread to execute.
+
+This implementation of the PSJF scheduling algorithm is preemptive, meaning that the currently executing thread can be preempted if a new thread with a shorter burst time arrives.
+
 ### MLFQ Scheduler
+
+The implementation of MLFQ scheduelr starts with an array of queues, where the index, from low to high, represents the priority of the queue, from top priority to low priority.
+
+thread_queue[0] is the higher priority queue than thread_queue[3], for example.
+
+When the thread is either interrupted or yielded, we sends them back to either the same priority queue or one priority lower, depending on if the time quantum has been spent.
+
 
 
 ## Metrics
+
