@@ -11,7 +11,7 @@ void my_function(int arg1, int arg2) {
 }
 
 int x = 0;
-int loop = 10000000;
+int loop = 10000;
 
 worker_mutex_t thread_mutex;
 void *add_counter(void *arg)
@@ -26,7 +26,7 @@ void *add_counter(void *arg)
     {
         // Modify the resource while x is mutex locked
         x = x + 1;
-        printf("Thread id: %d modified X=%d\n", getCurrentThread()->thread_id, x);
+        // printf("Thread id: %d modified X=%d\n", getCurrentThread()->thread_id, x);
     }
     // unlock the mutex, allowing other threads to access x
     // worker_mutex_unlock(&thread_mutex);
@@ -76,14 +76,11 @@ int main(int argc, char **argv)
         int tid = worker_create(&thread[i], NULL, add_counter, NULL);
         printf("Created thread id: %d\n", tid);
     }
-    // printf("Current thread id: %d\n", getCurrent)
-    // worker_create(&thread[0], NULL, add_counter, NULL);
-    // worker_create(&thread[1], NULL, add_counter, NULL);
-
     for (i = 0; i < thread_num; ++i)
     {
         worker_join(thread[i], NULL);
     }
+    print_app_stats();
 
     // worker_t *tid_pointer2 = malloc(sizeof(worker_t));
     // *tid_pointer2 = 2;

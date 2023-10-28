@@ -69,6 +69,17 @@ int safe_malloc(void **ptr, size_t size)
     return *ptr != NULL;
 }
 
+double compute_milliseconds(struct timespec start)
+{
+    struct timespec end;
+    clock_gettime(CLOCK_MONOTONIC, &end);
+
+    double seconds_to_nanoseconds = (end.tv_sec - start.tv_sec) * 1000000000;
+    double nanoseconds = (end.tv_nsec - start.tv_nsec);
+
+    return (seconds_to_nanoseconds + nanoseconds) / 1000000;
+}
+
 void fall_back_to_schedular(int signum)
 {
     if (DEBUG)
@@ -141,8 +152,9 @@ int _create_thread(tcb **thread_tcb_pointer, worker_t *thread_id)
     {
         return ERROR_CODE;
     }
-
+    clock_gettime(CLOCK_MONOTONIC, &thread_tcb->timer_start);
     thread_tcb->thread_id = *thread_id; // thread-id
+    thread_tcb->run_already = 0;
     return 1;
 };
 
@@ -370,6 +382,8 @@ int worker_join(worker_t thread, void **value_ptr)
     {
         *value_ptr = thread_tcb->ret_val;
     }
+    avg_turn_time = compute_milliseconds(thread_tcb->timer_start);
+
     // if (&thread_tcb->context.uc_stack != NULL)
     // {
     //     free(thread_tcb->context.uc_stack.ss_sp);
@@ -501,18 +515,18 @@ void *schedule_entry_point(void *args)
 
 static void schedule()
 {
-    // - schedule policy
-    #ifndef MLFQ
-        // Choose PSJF
-        sched_psjf(getThreadQueue());
-    #else
-        // Choose MLFQ
-        sched_mlfq();
-    #endif
+// - schedule policy
+#ifndef MLFQ
+    // Choose PSJF
+    sched_psjf(getThreadQueue());
+#else
+    // Choose MLFQ
+    sched_mlfq();
+#endif
 }
 
 /* Pre-emptive Shortest Job First (POLICY_PSJF) scheduling algorithm */
-static int sched_psjf(queue_t * q)
+static int sched_psjf(queue_t *q)
 {
     if (DEBUG)
     {
@@ -542,8 +556,12 @@ static int sched_psjf(queue_t * q)
         if (!is_empty(q))
         {
             tcb *thread_to_run = dequeue(q);
-            Threads_state ts = THREAD_RUNNING;
-            thread_to_run->status = ts;
+            thread_to_run->status = THREAD_RUNNING;
+            if (!thread_to_run->run_already)
+            {
+                avg_resp_time = compute_milliseconds(thread_to_run->timer_start);
+                thread_to_run->run_already = 1;
+            }
 
             if (DEBUG)
             {

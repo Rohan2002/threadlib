@@ -19,7 +19,7 @@
 
 #define QUANTUM 1
 
-# define DEBUG 0
+#define DEBUG 0
 /* include lib header files that you need here: */
 #include <unistd.h>
 #include <sys/syscall.h>
@@ -28,77 +28,73 @@
 #include <stdlib.h>
 #include <ucontext.h>
 #include <signal.h>
+#include <time.h>
 #include "queue.h"
 
 typedef unsigned int worker_t;
 
 // util functions
-int safe_malloc(void** ptr, size_t size);
+int safe_malloc(void **ptr, size_t size);
 
 // thread variables and data structures.
-typedef enum {
-    THREAD_READY,
-    THREAD_RUNNING,
-    THREAD_BLOCKED,
-    THREAD_FINISHED 
+typedef enum
+{
+	THREAD_READY,
+	THREAD_RUNNING,
+	THREAD_BLOCKED,
+	THREAD_FINISHED
 } Threads_state;
 
-typedef struct TCB {
-	/* add important states in a thread control block */
-	// thread Id
-	// thread status
-	// thread context
-	// thread stack
-	// thread priority
-	// And more ...
-
-	// YOUR CODE HERE
+typedef struct TCB
+{
 	worker_t thread_id;
 	ucontext_t context;
-	void* stack;
+	void *stack;
 	Threads_state status;
 	int priority;
-	void* ret_val;
+	void *ret_val;
 	int time_running;
-} tcb; 
+	struct timespec timer_start;
+	int run_already;
+} tcb;
 
 typedef uint worker_t;
 
 extern tcb *thread_table[MAX_THREADS];
 
-
-int _populate_thread_context(tcb* thread_tcb);
+int _populate_thread_context(tcb *thread_tcb);
 int _create_thread_context(tcb *thread_tcb, void *(*function)(void *), void *arg);
 int _create_thread(tcb **thread_tcb_pointer, worker_t *thread_id);
 void create_thread_timer();
 
 /* mutex struct definition */
-typedef struct worker_mutex_t {
+typedef struct worker_mutex_t
+{
 	/* add something here */
 
 	// YOUR CODE HERE
 
-	volatile int locked;  // Flag indicating whether the mutex is locked (1) or unlocked (0)
-    tcb *owner;           // Pointer to the TCB of the owning thread
-    queue_t *block_list;  // Queue of TCBs of threads blocked waiting for this mutex
+	volatile int locked; // Flag indicating whether the mutex is locked (1) or unlocked (0)
+	tcb *owner;			 // Pointer to the TCB of the owning thread
+	queue_t *block_list; // Queue of TCBs of threads blocked waiting for this mutex
 
 } worker_mutex_t;
 
+double compute_milliseconds(struct timespec start);
 
-void setCurrentThread(tcb* thread_exec);
-tcb* getCurrentThread();
+void setCurrentThread(tcb *thread_exec);
+tcb *getCurrentThread();
 
-void setSchedularThread(tcb* thread_exec);
-tcb* getSchedularThread();
+void setSchedularThread(tcb *thread_exec);
+tcb *getSchedularThread();
 
-void setThreadQueue(queue_t* q);
-queue_t* getThreadQueue();
+void setThreadQueue(queue_t *q);
+queue_t *getThreadQueue();
 
-int thread_finished(tcb* thread);
+int thread_finished(tcb *thread);
 
 /* create a new thread */
-int worker_create(worker_t * thread, pthread_attr_t * attr, void
-    *(*function)(void*), void * arg);
+int worker_create(worker_t *thread, pthread_attr_t *attr, void *(*function)(void *), void *arg);
 
 /* give CPU pocession to other user level worker threads voluntarily */
 int worker_yield();
@@ -111,7 +107,7 @@ int worker_join(worker_t thread, void **value_ptr);
 
 /* initial the mutex lock */
 int worker_mutex_init(worker_mutex_t *mutex, const pthread_mutexattr_t
-    *mutexattr);
+												 *mutexattr);
 
 /* aquire the mutex lock */
 int worker_mutex_lock(worker_mutex_t *mutex);
@@ -124,10 +120,10 @@ int worker_mutex_destroy(worker_mutex_t *mutex);
 
 /* Scheduler */
 typedef struct sigaction signal_type;
-void *schedule_entry_point(void* args);
+void *schedule_entry_point(void *args);
 static void schedule();
 
-static int sched_psjf(queue_t * q);
+static int sched_psjf(queue_t *q);
 static int sched_mlfq();
 
 /* Function to print global statistics. Do not modify this function.*/
