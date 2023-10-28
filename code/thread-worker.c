@@ -453,7 +453,7 @@ void *schedule_entry_point(void *args)
 
 static void schedule()
 {
-    sched_psjf();
+    sched_mlfq();
     // - every time a timer interrupt occurs, your worker thread library
     // should be contexted switched from a thread context to this
     // schedule() function
@@ -476,56 +476,160 @@ static void schedule()
 }
 
 // /* Pre-emptive Shortest Job First (POLICY_PSJF) scheduling algorithm */
-static int sched_psjf()
-{
-    printf("Come back to schedular\n");
-    while (1)
-    {
-        if (getCurrentThread() != NULL && !thread_finished(getCurrentThread()))
-        {
-            printf("Enqueue running thread id: %d\n", getCurrentThread()->thread_id);
-            enqueue(getThreadQueue(), getCurrentThread());
-            // thread got interrupted. enqueue again.
-        }
-        printf("Finding next thread to schedule\n");
-        if (is_empty(getThreadQueue()))
-        {
-            printf("Main thread exited unexpectedly! Killing main process.");
-            exit(1); // completely destroys process
-        }
-        // worker thread exec.
-        if (!is_empty(getThreadQueue()))
-        {
-            tcb *thread_to_run = dequeue(getThreadQueue());
-            Threads_state ts = THREAD_RUNNING;
-            thread_to_run->status = ts;
+// static int sched_psjf()
+// {
+//     printf("Come back to schedular\n");
+//     while (1)
+//     {
+//         if (getCurrentThread() != NULL && !thread_finished(getCurrentThread()))
+//         {
+//             printf("Enqueue running thread id: %d\n", getCurrentThread()->thread_id);
+//             enqueue(getThreadQueue(), getCurrentThread());
+//             // thread got interrupted. enqueue again.
+//         }
+//         printf("Finding next thread to schedule\n");
+//         if (is_empty(getThreadQueue()))
+//         {
+//             printf("Main thread exited unexpectedly! Killing main process.");
+//             exit(1); // completely destroys process
+//         }
+//         // worker thread exec.
+//         if (!is_empty(getThreadQueue()))
+//         {
+//             tcb *thread_to_run = dequeue(getThreadQueue());
+//             Threads_state ts = THREAD_RUNNING;
+//             thread_to_run->status = ts;
 
-            printf("Dequeued running thread id: %d\n", thread_to_run->thread_id);
+//             printf("Dequeued running thread id: %d\n", thread_to_run->thread_id);
 
-            setCurrentThread(thread_to_run);
-            printf("Swapping context to thread id: %d\n", getCurrentThread()->thread_id);
-            if (getCurrentThread()->thread_id == MAIN_THREAD_ID)
-            {
-                printf("&getCurrentThread()->context: {%p}\n", &getCurrentThread()->context);
-                setcontext(&getCurrentThread()->context);
-            }
-            if (swapcontext(&getSchedularThread()->context, &getCurrentThread()->context) < 0)
-            {
-                printf("Swap context failed\n");
-                return ERROR_CODE;
-            }
-            printf("After context swap\n");
-        }
-    }
-}
-
-// /* Preemptive MLFQ scheduling algorithm */
-// static void sched_mlfq() {
-// 	// - your own implementation of MLFQ
-// 	// (feel free to modify arguments and return types)
-
-// 	// YOUR CODE HERE
+//             setCurrentThread(thread_to_run);
+//             printf("Swapping context to thread id: %d\n", getCurrentThread()->thread_id);
+//             if (getCurrentThread()->thread_id == MAIN_THREAD_ID)
+//             {
+//                 printf("&getCurrentThread()->context: {%p}\n", &getCurrentThread()->context);
+//                 setcontext(&getCurrentThread()->context);
+//             }
+//             if (swapcontext(&getSchedularThread()->context, &getCurrentThread()->context) < 0)
+//             {
+//                 printf("Swap context failed\n");
+//                 return ERROR_CODE;
+//             }
+//             printf("After context swap\n");
+//         }
+//     }
 // }
+
+
+#define NUM_PRIORITY_LEVELS 4
+#define TIME_SLICE 100 // in milliseconds
+
+/* Preemptive MLFQ scheduling algorithm */
+static int sched_mlfq() {
+	// - your own implementation of MLFQ
+	// (feel free to modify arguments and return types)
+
+	// YOUR CODE HERE
+    int time_since_last_promotion = 0;
+    queue_t *thread_queues[NUM_PRIORITY_LEVELS];
+    for (int i=0; i<NUM_PRIORITY_LEVELS; i++) {
+        thread_queues[i] = create_queue();
+    }
+    while(1)
+    {
+        if (getCurrentThread() != NULL && getCurrentThread()->status != THREAD_FINISHED)
+        {
+            // Enqueue thread in appropriate priority level
+            int priority = getCurrentThread()->priority;
+            enqueue(thread_queues[priority], getCurrentThread());
+        }
+
+        tcb* thread_to_run = NULL;
+
+        //determine the next thread to run by iterating through the queues
+        for(int i=0; i<NUM_PRIORITY_LEVELS; i++)
+        {
+            if (!is_empty(thread_queues[i]))
+            {
+                thread_to_run = dequeue(thread_queues[i]);
+                break;
+            }
+        }   
+         // If no threads are ready to run, exit (There should always be a main thread)
+        if (thread_to_run == NULL) {
+            printf("Main thread exited unexpectedly! Killing main process.");
+            exit(1);
+        }
+
+        // Set the thread to running
+        thread_to_run->status = THREAD_RUNNING;
+
+        // Swap context to next thread
+        setCurrentThread(thread_to_run);
+        printf("Swapping context to thread id: %d\n", getCurrentThread()->thread_id);
+        if (getCurrentThread()->thread_id == MAIN_THREAD_ID)
+        {
+            printf("&getCurrentThread()->context: {%p}\n", &getCurrentThread()->context);
+            setcontext(&getCurrentThread()->context);
+        }
+        if (swapcontext(&getSchedularThread()->context, &getCurrentThread()->context) < 0)
+        {
+            printf("Swap context failed\n");
+            exit(ERROR_CODE);
+        }
+        printf("After context swap\n");
+
+        // Update time since last promotion
+        time_since_last_promotion += TIME_SLICE;
+
+        //aging (Rule 4)
+        // If a thread has been waiting for more than 500ms, it should be promoted to a higher priority level
+        if (time_since_last_promotion >= 500) {
+            for (int i = 1; i < NUM_PRIORITY_LEVELS; i++) {
+                tcb *thread = NULL;
+                while (!is_empty(thread_queues[i])) {
+                    thread = dequeue(thread_queues[i]);
+                    thread->priority--;
+                    enqueue(thread_queues[i-1], thread);
+                }
+            }
+            time_since_last_promotion = 0;
+        }
+
+        // Implement preemption
+        // If a thread has been running for more than 1000ms, it should be preempted
+        if (getCurrentThread() != NULL && getCurrentThread()->time_slice >= TIME_SLICE) {
+            getCurrentThread()->time_slice = 0;
+            int priority = getCurrentThread()->priority;
+            if (priority < NUM_PRIORITY_LEVELS - 1) {
+                enqueue(thread_queues[priority+1], getCurrentThread());
+            } else {
+                enqueue(thread_queues[priority], getCurrentThread());
+            }
+            thread_to_run = NULL;
+        }
+
+        // Implement demotion
+        // If a thread has been running for more than 1000ms, it should be demoted to a lower priority level
+        if (getCurrentThread() != NULL && getCurrentThread()->time_running >= 1000) {
+            getCurrentThread()->time_running = 0;
+            int priority = getCurrentThread()->priority;
+            if (priority > 0) {
+                enqueue(thread_queues[priority-1], getCurrentThread());
+            } else {
+                enqueue(thread_queues[priority], getCurrentThread());
+            }
+            thread_to_run = NULL;
+        }
+
+        // Update time slice and time running for current thread
+        if (getCurrentThread() != NULL) {
+            getCurrentThread()->time_slice += TIME_SLICE;
+            getCurrentThread()->time_running += TIME_SLICE;
+        }
+
+    }
+    return 0;
+}
 
 // DO NOT MODIFY THIS FUNCTION
 /* Function to print global statistics. Do not modify this function.*/

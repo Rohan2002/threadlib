@@ -57,6 +57,8 @@ typedef struct TCB {
 	Threads_state status;
 	int priority;
 	void* ret_val;
+	int time_slice;
+	int time_running;
 } tcb; 
 
 typedef uint worker_t;
@@ -123,7 +125,8 @@ int worker_mutex_destroy(worker_mutex_t *mutex);
 typedef struct sigaction signal_type;
 void *schedule_entry_point(void* args);
 static void schedule();
-static int sched_psjf();
+// static int sched_psjf();
+static int sched_mlfq();
 
 /* Function to print global statistics. Do not modify this function.*/
 void print_app_stats(void);
