@@ -304,6 +304,7 @@ int worker_yield()
     {
         printf("Before swap context to schedular Current thread ID: %d status: %d\n", getCurrentThread()->thread_id, getCurrentThread()->status);
     }
+    tot_cntx_switches++;
     if (swapcontext(&(current_thread->context), &(schedular_thread->context)) < 0)
     {
         perror("Cannot exec anymore\n");
@@ -324,6 +325,7 @@ void worker_exit(void *value_ptr)
     current_thread->ret_val = value_ptr;
     current_thread->status = THREAD_FINISHED;
 
+    tot_cntx_switches++;
     swapcontext(&current_thread->context, &getSchedularThread()->context);
 };
 
@@ -499,60 +501,77 @@ void *schedule_entry_point(void *args)
 
 static void schedule()
 {
-// - schedule policy
-#ifndef MLFQ
-    // Choose PSJF
-    sched_psjf();
-#else
-    // Choose MLFQ
-    sched_mlfq();
-#endif
+    // - schedule policy
+    #ifndef MLFQ
+        // Choose PSJF
+        sched_psjf(getThreadQueue());
+    #else
+        // Choose MLFQ
+        sched_mlfq();
+    #endif
 }
 
 /* Pre-emptive Shortest Job First (POLICY_PSJF) scheduling algorithm */
-// static int sched_psjf()
-// {
-//     printf("Come back to schedular\n");
-//     while (1)
-//     {
-//         if (getCurrentThread() != NULL && !thread_finished(getCurrentThread()))
-//         {
-//             printf("Enqueue running thread id: %d\n", getCurrentThread()->thread_id);
-//             enqueue(getThreadQueue(), getCurrentThread());
-//             // thread got interrupted. enqueue again.
-//         }
-//         printf("Finding next thread to schedule\n");
-//         if (is_empty(getThreadQueue()))
-//         {
-//             printf("Main thread exited unexpectedly! Killing main process.");
-//             exit(1); // completely destroys process
-//         }
-//         // worker thread exec.
-//         if (!is_empty(getThreadQueue()))
-//         {
-//             tcb *thread_to_run = dequeue(getThreadQueue());
-//             Threads_state ts = THREAD_RUNNING;
-//             thread_to_run->status = ts;
+static int sched_psjf(queue_t * q)
+{
+    if (DEBUG)
+    {
+        printf("Come back to schedular\n");
+    }
+    while (1)
+    {
+        if (getCurrentThread() != NULL && !thread_finished(getCurrentThread()) && getCurrentThread()->status != THREAD_BLOCKED)
+        {
+            if (DEBUG)
+            {
+                printf("Enqueue running thread id: %d\n", getCurrentThread()->thread_id);
+            }
+            enqueue(q, getCurrentThread());
+            // thread got interrupted. enqueue again.
+        }
+        if (DEBUG)
+        {
+            printf("Finding next thread to schedule\n");
+        }
+        if (is_empty(q))
+        {
+            perror("Main thread exited unexpectedly! Killing main process.");
+            exit(1); // completely destroys process
+        }
+        // worker thread exec.
+        if (!is_empty(q))
+        {
+            tcb *thread_to_run = dequeue(q);
+            Threads_state ts = THREAD_RUNNING;
+            thread_to_run->status = ts;
 
-//             printf("Dequeued running thread id: %d\n", thread_to_run->thread_id);
-
-//             setCurrentThread(thread_to_run);
-//             printf("Swapping context to thread id: %d\n", getCurrentThread()->thread_id);
-//             if (getCurrentThread()->thread_id == MAIN_THREAD_ID)
-//             {
-//                 printf("&getCurrentThread()->context: {%p}\n", &getCurrentThread()->context);
-//                 setcontext(&getCurrentThread()->context);
-//             }
-//             if (swapcontext(&getSchedularThread()->context, &getCurrentThread()->context) < 0)
-//             {
-//                 printf("Swap context failed\n");
-//                 return ERROR_CODE;
-//             }
-//             printf("After context swap\n");
-//         }
-//     }
-// }
-
+            if (DEBUG)
+            {
+                printf("Dequeued running thread id: %d\n", thread_to_run->thread_id);
+            }
+            setCurrentThread(thread_to_run);
+            if (DEBUG)
+            {
+                printf("Swapping context to thread id: %d\n", getCurrentThread()->thread_id);
+            }
+            if (getCurrentThread()->thread_id == MAIN_THREAD_ID)
+            {
+                if (DEBUG)
+                {
+                    printf("&getCurrentThread()->context: {%p}\n", &getCurrentThread()->context);
+                }
+                setcontext(&getCurrentThread()->context);
+            }
+            tot_cntx_switches++;
+            if (swapcontext(&getSchedularThread()->context, &getCurrentThread()->context) < 0)
+            {
+                perror("Swap context failed\n");
+                return ERROR_CODE;
+            }
+        }
+    }
+    return 1;
+}
 
 #define NUM_PRIORITY_LEVELS 4
 #define TIME_QUANTUM 1
@@ -564,7 +583,8 @@ static int sched_mlfq()
 
     // Define multiple priority levels
     queue_t *thread_queues[NUM_PRIORITY_LEVELS];
-    for (int i = 0; i < NUM_PRIORITY_LEVELS; i++) {
+    for (int i = 0; i < NUM_PRIORITY_LEVELS; i++)
+    {
         thread_queues[i] = create_queue();
     }
 
@@ -580,20 +600,21 @@ static int sched_mlfq()
             enqueue(thread_queues[priority], getCurrentThread());
         }
 
-
         // Find next thread to schedule
         printf("Finding next thread to schedule\n");
         tcb *thread_to_run = NULL;
-        for (int i = 0; i < NUM_PRIORITY_LEVELS; i++) {
-            if (!is_empty(thread_queues[i])) {
+        for (int i = 0; i < NUM_PRIORITY_LEVELS; i++)
+        {
+            if (!is_empty(thread_queues[i]))
+            {
                 thread_to_run = dequeue(thread_queues[i]);
                 break;
             }
         }
 
-
         // If no threads are ready to run, exit
-        if (thread_to_run == NULL) {
+        if (thread_to_run == NULL)
+        {
             printf("Main thread exited unexpectedly! Killing main process.");
             exit(1);
         }
@@ -609,6 +630,7 @@ static int sched_mlfq()
             printf("&getCurrentThread()->context: {%p}\n", &getCurrentThread()->context);
             setcontext(&getCurrentThread()->context);
         }
+        tot_cntx_switches++;
         if (swapcontext(&getSchedularThread()->context, &getCurrentThread()->context) < 0)
         {
             printf("Swap context failed\n");
@@ -620,13 +642,16 @@ static int sched_mlfq()
         time_since_last_promotion += TIME_QUANTUM;
 
         // Implement aging
-        if (time_since_last_promotion >= 5) {
-            for (int i = 1; i < NUM_PRIORITY_LEVELS; i++) {
+        if (time_since_last_promotion >= 5)
+        {
+            for (int i = 1; i < NUM_PRIORITY_LEVELS; i++)
+            {
                 tcb *thread = NULL;
-                while (!is_empty(thread_queues[i])) {
+                while (!is_empty(thread_queues[i]))
+                {
                     thread = dequeue(thread_queues[i]);
                     thread->priority--;
-                    enqueue(thread_queues[i-1], thread);
+                    enqueue(thread_queues[i - 1], thread);
                 }
             }
             time_since_last_promotion = 0;
@@ -634,19 +659,24 @@ static int sched_mlfq()
 
         // Implement preemption
         // If thread has run for TIME_QUANTUM, demote it to the next priority level
-        if (getCurrentThread() != NULL && getCurrentThread()->time_running >= TIME_QUANTUM) {
+        if (getCurrentThread() != NULL && getCurrentThread()->time_running >= TIME_QUANTUM)
+        {
             getCurrentThread()->time_running = 0;
             int priority = getCurrentThread()->priority;
-            if (priority < NUM_PRIORITY_LEVELS - 1) {
-                enqueue(thread_queues[priority+1], getCurrentThread());
-            } else {
+            if (priority < NUM_PRIORITY_LEVELS - 1)
+            {
+                enqueue(thread_queues[priority + 1], getCurrentThread());
+            }
+            else
+            {
                 enqueue(thread_queues[priority], getCurrentThread());
             }
             thread_to_run = NULL;
         }
 
         // Update time running for current thread
-        if (getCurrentThread() != NULL) {
+        if (getCurrentThread() != NULL)
+        {
             getCurrentThread()->time_running += TIME_QUANTUM;
         }
     }

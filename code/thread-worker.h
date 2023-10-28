@@ -127,8 +127,8 @@ typedef struct sigaction signal_type;
 void *schedule_entry_point(void* args);
 static void schedule();
 
-static int sched_psjf();
-static void sched_mlfq();
+static int sched_psjf(queue_t * q);
+static int sched_mlfq();
 
 /* Function to print global statistics. Do not modify this function.*/
 void print_app_stats(void);
