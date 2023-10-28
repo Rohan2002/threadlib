@@ -67,7 +67,120 @@ thread_queue[0] is the higher priority queue than thread_queue[3], for example.
 
 When the thread is either interrupted or yielded, we sends them back to either the same priority queue or one priority lower, depending on if the time quantum has been spent.
 
+the context switching logic should be similar to PSJF, but at the end our MLFQ doesn't seems to be running very well. The testing below are done in PSJF.
 
 
 ## Metrics
 
+./external_cal 1
+***************************
+Total run time: 503 micro-seconds
+Total sum is: -649892461
+Total context switches 3 
+Average turnaround time 503.827769 
+Average response time  503.850939 
+***************************
+./external_cal 6
+***************************
+Total run time: 514 micro-seconds
+Total sum is: -649892461
+Total context switches 13 
+Average turnaround time 513.276029 
+Average response time  513.287053 
+***************************
+./external_cal 10
+***************************
+Total run time: 483 micro-seconds
+Total sum is: -649892461
+Total context switches 21 
+Average turnaround time 482.825235 
+Average response time  482.896823 
+***************************
+./external_cal 50
+***************************
+Total run time: 505 micro-seconds
+Total sum is: -649892461
+Total context switches 101 
+Average turnaround time 504.268504 
+Average response time  504.540801 
+***************************
+
+ryd4@cpp:~/cs416/threadlib/code/benchmarks$ ./parallel_cal 1
+***************************
+Total run time: 1981 micro-seconds
+verified sum is: 83842816
+Total sum is: 83842816
+Total context switches 3 
+Average turnaround time 1980.260892 
+Average response time  1980.265516 
+***************************
+ryd4@cpp:~/cs416/threadlib/code/benchmarks$ ./parallel_cal 6
+***************************
+Total run time: 1978 micro-seconds
+verified sum is: 83842816
+Total sum is: 83842816
+Total context switches 13 
+Average turnaround time 1977.522690 
+Average response time  1977.531597 
+***************************
+ryd4@cpp:~/cs416/threadlib/code/benchmarks$ ./parallel_cal 10
+***************************
+Total run time: 1980 micro-seconds
+verified sum is: 83842816
+Total sum is: 83842816
+Total context switches 21 
+Average turnaround time 1979.362688 
+Average response time  1979.379826 
+***************************
+ryd4@cpp:~/cs416/threadlib/code/benchmarks$ ./parallel_cal 50
+***************************
+Total run time: 1980 micro-seconds
+verified sum is: 83842816
+Total sum is: 83842816
+Total context switches 101 
+Average turnaround time 1979.258650 
+Average response time  1979.325612 
+***************************
+
+./vector_multiply 1
+***************************
+Total run time: 38 micro-seconds
+verified sum is: 631560480
+Total sum is: 631560480
+Total context switches 3 
+Average turnaround time 38.168003 
+Average response time  38.173617 
+***************************
+ ./vector_multiply 6
+***************************
+Total run time: 41 micro-seconds
+verified sum is: 631560480
+Total sum is: 631560480
+Total context switches 13 
+Average turnaround time 41.081185 
+Average response time  41.094704 
+***************************
+./vector_multiply 10
+***************************
+Total run time: 41 micro-seconds
+verified sum is: 631560480
+Total sum is: 631560480
+Total context switches 21 
+Average turnaround time 41.751925 
+Average response time  41.774248 
+***************************
+./vector_multiply 50
+***************************
+Total run time: 61 micro-seconds
+verified sum is: 631560480
+Total sum is: 631560480
+Total context switches 101 
+Average turnaround time 61.200254 
+Average response time  61.284306 
+***************************
+
+On average, our threading library is a few times slower than the pthread library implementation
+
+take ./parrllel_cal 6 as an example, our library used 1978 micro-seconds to complete, when it took 387 micro seconds for p-thread
+
+This comparison is also present in other test, proving the pthread library's superiority over our implementation.
