@@ -16,4 +16,4 @@ test:
 	$(CC) $(CFLAGS) -pthread -o test test.c -L../ -lthread-worker
 
 clean:
-	rm -rf testcase test parallel_cal vector_multiply external_cal *.o *.dSYM
+	rm -rf testcase test parallel_cal vector_multiply external_cal *.o *.dSYM record

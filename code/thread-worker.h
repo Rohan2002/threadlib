@@ -17,7 +17,7 @@
 
 #define ERROR_CODE 0
 
-#define QUANTUM 1
+#define QUANTUM 10 // 10ms
 
 #define DEBUG 0
 /* include lib header files that you need here: */

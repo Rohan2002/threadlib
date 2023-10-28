@@ -1,8 +1,8 @@
 // File:	thread-worker.c
 
-// List all group member's name:
-// username of iLab:
-// iLab Server:
+// List all group member's name: Rohan Deshpande, and Jinyue Liu
+// username of iLab: ryd4, jl2661
+// iLab Server: cs416f23-43
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -113,7 +113,7 @@ void create_thread_timer()
     struct itimerval timer;
 
     timer.it_value.tv_usec = 0;
-    timer.it_value.tv_sec = 1; // TODO: QUantum variable
+    timer.it_value.tv_sec = QUANTUM * 1000;
 
     timer.it_interval = timer.it_value;
 
@@ -384,11 +384,11 @@ int worker_join(worker_t thread, void **value_ptr)
     }
     avg_turn_time = compute_milliseconds(thread_tcb->timer_start);
 
-    // if (&thread_tcb->context.uc_stack != NULL)
-    // {
-    //     free(thread_tcb->context.uc_stack.ss_sp);
-    // }
-    // free(thread_tcb);
+    if (&thread_tcb->context.uc_stack != NULL)
+    {
+        free(thread_tcb->context.uc_stack.ss_sp);
+    }
+    free(thread_tcb);
     return 1;
 };
 
@@ -571,14 +571,6 @@ static int sched_psjf(queue_t *q)
             if (DEBUG)
             {
                 printf("Swapping context to thread id: %d\n", getCurrentThread()->thread_id);
-            }
-            if (getCurrentThread()->thread_id == MAIN_THREAD_ID)
-            {
-                if (DEBUG)
-                {
-                    printf("&getCurrentThread()->context: {%p}\n", &getCurrentThread()->context);
-                }
-                setcontext(&getCurrentThread()->context);
             }
             tot_cntx_switches++;
             if (swapcontext(&getSchedularThread()->context, &getCurrentThread()->context) < 0)
