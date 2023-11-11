@@ -1,9 +1,3 @@
-// File:	worker_t.h
-
-// List all group member's name:
-// username of iLab:
-// iLab Server:
-
 #ifndef WORKER_T_H
 #define WORKER_T_H
 
@@ -20,7 +14,7 @@
 #define QUANTUM 10 // 10ms
 
 #define DEBUG 0
-/* include lib header files that you need here: */
+
 #include <unistd.h>
 #include <sys/syscall.h>
 #include <sys/types.h>
